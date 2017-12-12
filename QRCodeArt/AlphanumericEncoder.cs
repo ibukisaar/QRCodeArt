@@ -17,7 +17,7 @@ namespace QRCodeArt {
 
 		protected override int BitsOfDataLength {
 			get {
-				switch (QRVersion) {
+				switch (Version) {
 					case var v when v >= 1 && v <= 9: return 9;
 					case var v when v >= 10 && v <= 26: return 11;
 					case var v when v >= 27 && v <= 40: return 13;
@@ -28,7 +28,11 @@ namespace QRCodeArt {
 
 		public AlphanumericEncoder(int version, ECCLevel level) : base(version, level) { }
 
-		protected override BitList InternalEncode(byte[] data, int start, int length) {
+		protected override int InternaGetDataBitCount(int dataLength) {
+			return dataLength / 2 * 11 + dataLength % 2 * 6;
+		}
+
+		protected override BitSet InternalEncode(byte[] data, int start, int length) {
 			int Get(int i) {
 				var b = data[start + i];
 				if (b < 0x20 || b > 'Z' || AlphanumericTable[b - 0x20] < 0) throw new NotSupportedException();
@@ -36,7 +40,7 @@ namespace QRCodeArt {
 			}
 
 			var doubleLength = length / 2;
-			var result = new BitList(doubleLength * 11 + length % 2 * 6);
+			var result = new BitSet(InternaGetDataBitCount(length));
 			for (int i = 0; i < doubleLength; i++) {
 				int value = Get(2 * i) * 45 + Get(2 * i + 1);
 				result.Write(i * 11, value, 11);

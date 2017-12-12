@@ -24,7 +24,7 @@ namespace QRCodeArt.Test {
 
 			for (int x = 0; x < QRSurface.QRCode.N; x++) {
 				for (int y = 0; y < QRSurface.QRCode.N; y++) {
-					Brush brush = QRSurface.QRCode[x, y] ? black : white;
+					Brush brush = QRSurface.QRCode[x, y].Value ? black : white;
 					double canvasX = x * QRSurface.CellWidth;
 					double canvasY = y * QRSurface.CellWidth;
 					dc.DrawRectangle(brush, null, new Rect(canvasX, canvasY, QRSurface.CellWidth, QRSurface.CellWidth));

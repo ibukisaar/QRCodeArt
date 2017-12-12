@@ -6,10 +6,10 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace QRCodeArt {
-	public sealed class BitList : IEnumerable {
+	public sealed class BitSet : IEnumerable {
 		static readonly byte[] ReverseTable;
 
-		static BitList() {
+		static BitSet() {
 			ReverseTable = new byte[256];
 			for (int i = 0; i < 256; i++) {
 				ReverseTable[i] = (byte) ((i * 0x0202020202L & 0x010884422010L) % 1023);
@@ -38,14 +38,20 @@ namespace QRCodeArt {
 
 		public byte[] ByteArray => values;
 
-		public BitList(int bitCount) {
+		public BitSet(int bitCount) {
 			values = new byte[GetByteCount(bitCount)];
 			this.bitCount = bitCount;
 		}
 
-		public BitList(byte[] bitBytes) {
+		public BitSet(byte[] bitBytes) {
 			values = bitBytes;
 			bitCount = values.Length * 8;
+		}
+
+		public BitSet(bool[] allValue) {
+			values = new byte[(allValue.Length + 7) >> 3];
+			bitCount = allValue.Length;
+			for (int i = 0; i < bitCount; i++) this[i] = allValue[i];
 		}
 
 		public IEnumerator GetEnumerator() {
@@ -61,7 +67,7 @@ namespace QRCodeArt {
 			}
 		}
 
-		public void Write(int dstIndex, BitList src, int srcIndex, int srcCount) {
+		public void Write(int dstIndex, BitSet src, int srcIndex, int srcCount) {
 			if (dstIndex + srcCount > bitCount || srcIndex + srcCount > src.bitCount) throw new ArgumentOutOfRangeException();
 
 			for (int i = 0; i < srcCount; i++) {

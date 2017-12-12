@@ -503,41 +503,90 @@ namespace QRCodeArt {
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		static int GetIndex(ECCLevel level) => (int) level ^ 1;
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static (int NumberOfDataBytes, int Numeric, int Alphanumeric, int Byte, int Kanji) GetDataCapacityInfo(int version, ECCLevel level) {
+			return DataCapacityTable[version - 1, GetIndex(level)];
+		}
 
-		protected readonly int QRVersion;
-		protected readonly ECCLevel QRECCLevel;
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static (int ECCPerBytes, int BlocksInGroup1, int CodewordsInGroup1, int BlocksInGroup2, int CodewordsInGroup2) GetEccInfo(int version, ECCLevel level) {
+			return ECCTable[version - 1, GetIndex(level)];
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static int GetTotalEccBytes(int version, ECCLevel level) {
+			var info = GetEccInfo(version, level);
+			return (info.BlocksInGroup1 + info.BlocksInGroup2) * info.ECCPerBytes;
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static int GetTotalBytes(int version, ECCLevel level) {
+			var (eccBytes, blocks1, _, blocks2, _) = GetEccInfo(version, level);
+			return GetDataCapacityInfo(version, level).NumberOfDataBytes + (blocks1 + blocks2) * eccBytes;
+		}
+
+		public static int GetMaxErrorAllowBytes(int version, ECCLevel level) {
+			if (version == 1) {
+				return level == ECCLevel.L ? 2 :
+					level == ECCLevel.M ? 4 :
+					level == ECCLevel.Q ? 6 :
+					8;
+			} else if (version == 2 && level == ECCLevel.L) {
+				return 4;
+			} else if (version == 3 && level == ECCLevel.L) {
+				return 7;
+			} else {
+				return GetEccInfo(version, level).ECCPerBytes / 2;
+			}
+		}
+
+
+		protected readonly int Version;
+		protected readonly ECCLevel EccLevel;
 		public readonly (int NumberOfDataBytes, int Numeric, int Alphanumeric, int Byte, int Kanji) CapacityInfo;
 		public readonly (int ECCPerBytes, int BlocksInGroup1, int CodewordsInGroup1, int BlocksInGroup2, int CodewordsInGroup2) ECCInfo;
 
 		public abstract QRDataMode DataMode { get; }
 		protected abstract int BitsOfDataLength { get; }
+		public int TotalBytes => GetTotalBytes(Version, EccLevel);
 
 		public QRDataEncoder(int version, ECCLevel level) {
-			QRVersion = version;
-			QRECCLevel = level;
+			Version = version;
+			EccLevel = level;
 			CapacityInfo = DataCapacityTable[version - 1, GetIndex(level)];
 			ECCInfo = ECCTable[version - 1, GetIndex(level)];
 		}
 
-		protected abstract BitList InternalEncode(byte[] data, int start, int length);
+		protected abstract BitSet InternalEncode(byte[] data, int start, int length);
 
-		private BitList DataEncode(byte[] data, int start, int length) {
+		protected abstract int InternaGetDataBitCount(int dataLength);
+
+		public int GetDataBitCount(int dataLength) {
+			var needBits = CapacityInfo.NumberOfDataBytes * 8;
+			int validBits = 4 + BitsOfDataLength + InternaGetDataBitCount(dataLength);
+			validBits += Math.Min(4, needBits - validBits);
+			return validBits;
+		}
+
+		public BitSet DataEncode(byte[] data, int start, int length, bool fillPadding = true) {
 			var binary = InternalEncode(data, start, length);
 			var needBits = CapacityInfo.NumberOfDataBytes * 8;
-			var bitResult = new BitList(needBits);
+			int validBits = GetDataBitCount(length);
+
+			var bitResult = new BitSet(needBits);
 			bitResult.Write(0, (int) DataMode, 4);
 			bitResult.Write(4, length, BitsOfDataLength);
 			bitResult.Write(4 + BitsOfDataLength, binary, 0, binary.Count);
 
-			var validBits = 4 + BitsOfDataLength + binary.Count;
-			validBits += Math.Min(4, needBits - validBits);
-			var padStart = (validBits + 7) & ~7;
-			while (padStart < bitResult.Count) {
-				bitResult.Write(padStart, 0b11101100, 8);
-				padStart += 8;
-				if (padStart < bitResult.Count) {
-					bitResult.Write(padStart, 0b00010001, 8);
+			if (fillPadding) {
+				var padStart = (validBits + 7) & ~7;
+				while (padStart < bitResult.Count) {
+					bitResult.Write(padStart, 0b11101100, 8);
 					padStart += 8;
+					if (padStart < bitResult.Count) {
+						bitResult.Write(padStart, 0b00010001, 8);
+						padStart += 8;
+					}
 				}
 			}
 			return bitResult;
@@ -552,61 +601,25 @@ namespace QRCodeArt {
 		/// </summary>
 		/// <param name="array"></param>
 		/// <returns></returns>
-		private byte[] CalculateECCWords(IReadOnlyList<byte> array) {
-			var eccBytes = ECCInfo.ECCPerBytes;
-			var gp = new GF.XPolynom(GF.FromExponent(0), GF.FromExponent(0));
-			for (int i = 1; i < eccBytes; i++) {
-				gp *= new GF.XPolynom(GF.FromExponent(i), GF.FromExponent(0));
-			}
-
-			var msgCount = array.Count;
-			var msg = new GF.XPolynom(msgCount);
-			for (int i = 0; i < msgCount; i++) {
-				msg[msgCount - 1 - i] = GF.FromPolynom(array[i]);
-			}
-
-			var ecc = msg.MulXPow(eccBytes) % gp;
-			var eccByteArray = new byte[eccBytes];
-			for (int i = 0; i < ecc.PolynomsCount; i++) {
-				eccByteArray[eccBytes - 1 - i] = (byte) ecc[i].Polynom;
-			}
-			return eccByteArray;
+		public static byte[] CalculateECCWords(ArraySegment<byte> array, int eccBytes) {
+			return GF.XPolynom.RSEncode(array.Array, array.Offset, array.Count, eccBytes);
 		}
 
-		public IReadOnlyList<(byte[] Data, byte[] Ecc)> Encode(byte[] data, int start, int length) {
-			var encodedData = DataEncode(data, start, length);
+		public (byte[] Data, byte[] Ecc)[] Encode(byte[] data, int start, int length, bool fillPadding = true, bool withEcc = true) {
+			var encodedData = DataEncode(data, start, length, fillPadding);
 			var wordsList = new List<(byte[] Data, byte[] Ecc)>();
 			for (int i = 0; i < ECCInfo.BlocksInGroup1; i++) {
 				var subData = new ArraySegment<byte>(encodedData.ByteArray, i * ECCInfo.CodewordsInGroup1, ECCInfo.CodewordsInGroup1);
-				var eccWords = CalculateECCWords(subData);
+				var eccWords = withEcc ? CalculateECCWords(subData, ECCInfo.ECCPerBytes) : null;
 				wordsList.Add((subData.ToArray(), eccWords));
 			}
 			for (int i = 0; i < ECCInfo.BlocksInGroup2; i++) {
 				var subData = new ArraySegment<byte>(encodedData.ByteArray, i * ECCInfo.CodewordsInGroup2, ECCInfo.CodewordsInGroup2);
-				var eccWords = CalculateECCWords(subData);
+				var eccWords = withEcc ? CalculateECCWords(subData, ECCInfo.ECCPerBytes) : null;
 				wordsList.Add((subData.ToArray(), eccWords));
 			}
-			return wordsList;
+			return wordsList.ToArray();
 		}
-
-		public byte[] Interlock(IReadOnlyList<(byte[] Data, byte[] Ecc)> groups) {
-			var result = new List<byte>(CapacityInfo.NumberOfDataBytes + ECCInfo.ECCPerBytes * (ECCInfo.BlocksInGroup1 + ECCInfo.BlocksInGroup2));
-			var maxLen = Math.Max(ECCInfo.CodewordsInGroup1, ECCInfo.CodewordsInGroup2);
-			for (int i = 0; i < maxLen; i++) {
-				foreach (var bytes in groups) {
-					if (i < bytes.Data.Length) result.Add(bytes.Data[i]);
-				}
-			}
-			maxLen = ECCInfo.ECCPerBytes;
-			for (int i = 0; i < maxLen; i++) {
-				foreach (var bytes in groups) {
-					result.Add(bytes.Ecc[i]);
-				}
-			}
-			return result.ToArray();
-		}
-
-
 
 		public static QRDataMode GuessMode(byte[] data) {
 			var curr = QRDataMode.Numeric;
@@ -622,28 +635,28 @@ namespace QRCodeArt {
 
 		public static int GuessVersion(byte[] data, ECCLevel level) => GuessVersion(data.Length, level, GuessMode(data));
 
-		public static int GuessVersion(int dataLength, ECCLevel level, QRDataMode mode) {
+		public static int GuessVersion(int dataBytes, ECCLevel level, QRDataMode mode) {
 			int version = 1;
 			int eccLevelIndex = GetIndex(level);
 			switch (mode) {
 				case QRDataMode.Numeric:
 					for (; version <= 40; version++) {
-						if (dataLength <= DataCapacityTable[version - 1, eccLevelIndex].Numeric) return version;
+						if (dataBytes <= DataCapacityTable[version - 1, eccLevelIndex].Numeric) return version;
 					}
 					goto Fail;
 				case QRDataMode.Alphanumeric:
 					for (; version <= 40; version++) {
-						if (dataLength <= DataCapacityTable[version - 1, eccLevelIndex].Alphanumeric) return version;
+						if (dataBytes <= DataCapacityTable[version - 1, eccLevelIndex].Alphanumeric) return version;
 					}
 					goto Fail;
 				case QRDataMode.Byte:
 					for (; version <= 40; version++) {
-						if (dataLength <= DataCapacityTable[version - 1, eccLevelIndex].Byte) return version;
+						if (dataBytes <= DataCapacityTable[version - 1, eccLevelIndex].Byte) return version;
 					}
 					goto Fail;
 				case QRDataMode.Kanji:
 					for (; version <= 40; version++) {
-						if (dataLength <= DataCapacityTable[version - 1, eccLevelIndex].Kanji) return version;
+						if (dataBytes <= DataCapacityTable[version - 1, eccLevelIndex].Kanji) return version;
 					}
 					goto Fail;
 			}
@@ -658,6 +671,12 @@ namespace QRCodeArt {
 				case QRDataMode.Byte: return new ByteEncoder(version, eccLevel);
 				default: throw new NotSupportedException($"不支持的模式：{mode}");
 			}
+		}
+
+		public static QRDataEncoder CreateEncoder(byte[] data, ECCLevel eccLevel) {
+			var mode = GuessMode(data);
+			var version = GuessVersion(data.Length, eccLevel, mode);
+			return CreateEncoder(mode, version, eccLevel);
 		}
 	}
 }

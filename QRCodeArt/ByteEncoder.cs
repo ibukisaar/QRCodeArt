@@ -10,7 +10,7 @@ namespace QRCodeArt {
 
 		protected override int BitsOfDataLength {
 			get {
-				switch (QRVersion) {
+				switch (Version) {
 					case var v when v >= 1 && v <= 9: return 8;
 					case var v when v >= 10 && v <= 40: return 16;
 					default: throw new InvalidOperationException($"为什么{nameof(QRCode.Version)}会超过范围？");
@@ -18,12 +18,16 @@ namespace QRCodeArt {
 			}
 		}
 
-		public ByteEncoder(int version, ECCLevel level) : base(version, level) {}
+		public ByteEncoder(int version, ECCLevel level) : base(version, level) { }
 
-		protected override BitList InternalEncode(byte[] data, int start, int length) {
+		protected override int InternaGetDataBitCount(int dataLength) {
+			return dataLength * 8;
+		}
+
+		protected override BitSet InternalEncode(byte[] data, int start, int length) {
 			var newData = new byte[length];
 			Array.Copy(data, start, newData, 0, length);
-			return new BitList(newData);
+			return new BitSet(newData);
 		}
 	}
 }

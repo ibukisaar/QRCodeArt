@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -42,7 +43,10 @@ namespace QRCodeArt {
 			}
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static GF FromExponent(int exponent) => new GF { Polynom = AlphaTable[exponent + 1] };
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static GF FromPolynom(int polynom) => new GF { Polynom = polynom };
 
 		public readonly static GF Zero = new GF();
@@ -53,9 +57,11 @@ namespace QRCodeArt {
 
 		public bool IsZero => Polynom == 0;
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static GF operator +(GF left, GF right)
 			=> FromPolynom(left.Polynom ^ right.Polynom);
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static GF operator *(GF left, GF right) {
 			if (left.IsZero || right.IsZero) return Zero;
 			var add = left.Exponent + right.Exponent;
@@ -70,6 +76,7 @@ namespace QRCodeArt {
 		}
 
 		public GF Pow(int n) {
+			if (IsZero) return Zero;
 			return FromExponent(Exponent * n % N);
 		}
 
@@ -223,6 +230,40 @@ namespace QRCodeArt {
 
 			public static XPolynom operator /(XPolynom left, XPolynom right) {
 				return left.DivMod(right, out _);
+			}
+			
+			/// <summary>
+			/// 快速RS编码
+			/// </summary>
+			/// <param name="msg"></param>
+			/// <param name="msgIndex"></param>
+			/// <param name="msgLength"></param>
+			/// <param name="eccCount"></param>
+			/// <returns></returns>
+			public static byte[] RSEncode(byte[] msg, int msgIndex, int msgLength, int eccCount) {
+				var gp = Cache<int, XPolynom>.Get(eccCount, n => {
+					var g = new XPolynom(FromExponent(0), FromExponent(0));
+					for (int i = 1; i < n; i++) {
+						g *= new XPolynom(FromExponent(i), FromExponent(0));
+					}
+					return g;
+				});
+
+				byte[] rem = new byte[eccCount];
+				Array.Copy(msg, msgIndex, rem, 0, Math.Min(msgLength, eccCount));
+				for (int i = 0; i < msgLength; i++) {
+					var div = FromPolynom(rem[0]);
+					for (int j = 1; j < eccCount; j++) {
+						rem[j - 1] = (byte) (FromPolynom(rem[j]) + gp[eccCount - j] * div).Polynom;
+					}
+					if (i + eccCount < msgLength) {
+						rem[eccCount - 1] = (byte) (FromPolynom(msg[msgIndex + i + eccCount]) + gp[0] * div).Polynom;
+					} else {
+						rem[eccCount - 1] = (byte) (gp[0] * div).Polynom;
+					}
+				}
+
+				return rem;
 			}
 		}
 	}

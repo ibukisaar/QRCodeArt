@@ -21,7 +21,7 @@ namespace QRCodeArt {
 					var e = new QRPaintEventArgs {
 						X = x * CellWidth,
 						Y = y * CellWidth,
-						Value = QRCode[x, y],
+						Value = QRCode[x, y].Value,
 						Width = CellWidth
 					};
 				}

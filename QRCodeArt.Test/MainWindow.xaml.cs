@@ -21,18 +21,23 @@ namespace QRCodeArt.Test {
 		public MainWindow() {
 			InitializeComponent();
 
-			byte[] data1 = Encoding.UTF8.GetBytes("0");
+			byte[] data1 = Encoding.UTF8.GetBytes("BAKA");
 			byte[] data2 = Encoding.UTF8.GetBytes("9");
-			var (qr1, qr2, swap) = QRCodeMagician.CreateObfuscatedQRCode(data1, data2);
-			qrCanvas1.QRSurface = new QRSurface(qr1, 5);
-			qrCanvas2.QRSurface = new QRSurface(qr2, 5);
+			//var (qr1, qr2, swap) = QRCodeMagician.CreateObfuscatedQRCode(data1, data2);
+			//qrCanvas1.QRSurface = new QRSurface(qr1, 5);
+			//qrCanvas2.QRSurface = new QRSurface(qr2, 5);
 
 			//var qr = QRCode.Analysis(data1, ECCLevel.M, MaskVersion.Version000);
 			//qr.Flush();
 			//qrCanvas1.QRSurface = new QRSurface(qr, 5);
 
-			//var qr = new QRCode(data1, ECCLevel.L, MaskVersion.Version000);
+			//var qr = new QRCode(15, QRDataMode.Alphanumeric, data1, ECCLevel.L, MaskVersion.Version000);
 			//qrCanvas1.QRSurface = new QRSurface(qr, 5);
+
+			
+			var pixels = new ImagePixel[QRCode.GetN(7), QRCode.GetN(7)];
+			var qr = QRCodeMagician.ImageArt(QRDataMode.Byte, 7, ECCLevel.L, MaskVersion.Version000, data1, pixels);
+			qrCanvas1.QRSurface = new QRSurface(qr, 5);
 		}
 	}
 }
