@@ -5,8 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace QRCodeArt {
-	public sealed class ByteEncoder : QRDataEncoder {
-		public override QRDataMode DataMode => QRDataMode.Byte;
+	public sealed class ByteEncoder : DataEncoder {
+		public override DataMode DataMode => DataMode.Byte;
 
 		protected override int BitsOfDataLength {
 			get {

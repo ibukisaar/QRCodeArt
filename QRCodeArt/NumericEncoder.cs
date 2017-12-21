@@ -6,10 +6,10 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace QRCodeArt {
-	public sealed class NumericEncoder : QRDataEncoder {
+	public sealed class NumericEncoder : DataEncoder {
 		static readonly int[] RemBits = { 0, 4, 7 };
 
-		public override QRDataMode DataMode => QRDataMode.Numeric;
+		public override DataMode DataMode => DataMode.Numeric;
 
 		protected override int BitsOfDataLength {
 			get {

@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace QRCodeArt {
-	public enum QRDataMode : byte {
+	public enum DataMode : byte {
 		ECI = 0b0111,
 		Numeric = 0b0001,
 		Alphanumeric = 0b0010,

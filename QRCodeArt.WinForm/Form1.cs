@@ -12,7 +12,7 @@ using QRCodeArt;
 namespace QRCodeArt.WinForm {
 	public partial class Form1 : Form {
 		private ECCLevel eccLevel = ECCLevel.L;
-		private QRDataMode? dataMode = null;
+		private DataMode? dataMode = null;
 
 		public Form1() {
 			InitializeComponent();
@@ -54,11 +54,11 @@ namespace QRCodeArt.WinForm {
 		}
 
 		private void cmbMode_SelectedIndexChanged(object sender, EventArgs e) {
-			switch (cmbEccLevel.SelectedIndex) {
+			switch (cmbMode.SelectedIndex) {
 				case 0: dataMode = null; break;
-				case 1: dataMode = QRDataMode.Numeric; break;
-				case 2: dataMode = QRDataMode.Alphanumeric; break;
-				case 3: dataMode = QRDataMode.Byte; break;
+				case 1: dataMode = DataMode.Numeric; break;
+				case 2: dataMode = DataMode.Alphanumeric; break;
+				case 3: dataMode = DataMode.Byte; break;
 			}
 		}
 
@@ -71,11 +71,12 @@ namespace QRCodeArt.WinForm {
 			int maxError = (int) numMaxError.Value;
 			int blackThreshold = (int) numBlackThreshold.Value;
 			int whiteThreshold = (int) numWhiteThreshold.Value;
-			dataMode = dataMode ?? QRDataEncoder.GuessMode(data);
-			if (version == 0) version = QRDataEncoder.GuessVersion(data.Length, eccLevel, dataMode.Value);
+			int deviation = (int) numDeviation.Value;
+			dataMode = dataMode ?? DataEncoder.GuessMode(data);
+			if (version == 0) version = DataEncoder.GuessVersion(data.Length, eccLevel, dataMode.Value);
 			var template = picTemplate.Image as Bitmap;
 
-			var pixels = QRCodeMagician.GetImagePixel(version, template, cellSize, blackThreshold, whiteThreshold, halftone);
+			var pixels = QRCodeMagician.GetImagePixel(version, template, cellSize, halftone, deviation);
 			var qr = QRCodeMagician.ImageArt(dataMode.Value, version, eccLevel, maskVersion, data, pixels, maxError);
 			int N = qr.N;
 
@@ -83,10 +84,13 @@ namespace QRCodeArt.WinForm {
 			var fixedWhiteBrush = Brushes.White;
 			var blackBrush = Brushes.Black;
 			var whiteBrush = Brushes.White;
-			var bitmap = new Bitmap((N + 2) * cellSize, (N + 2) * cellSize);
 			int margin = halftone;
-			if (halftone == 0) halftone = cellSize;
+			if (halftone <= 0 || halftone >= cellSize) {
+				halftone = cellSize;
+				margin = 0;
+			}
 
+			var bitmap = new Bitmap((N + 2) * cellSize, (N + 2) * cellSize);
 			using (var g = Graphics.FromImage(bitmap)) {
 				g.Clear(Color.White);
 				g.DrawImage(template, new Rectangle(cellSize, cellSize, N * cellSize, N * cellSize));
@@ -97,9 +101,9 @@ namespace QRCodeArt.WinForm {
 
 						if (margin == 0) {
 							if (qr[x, y].Value) {
-								g.FillRectangle(blackBrush, new Rectangle(drawX * cellSize + halftone, drawY * cellSize + halftone, halftone, halftone));
+								g.FillRectangle(blackBrush, new Rectangle(drawX * cellSize, drawY * cellSize, halftone, halftone));
 							} else {
-								g.FillRectangle(whiteBrush, new Rectangle(drawX * cellSize + halftone, drawY * cellSize + halftone, halftone, halftone));
+								g.FillRectangle(whiteBrush, new Rectangle(drawX * cellSize, drawY * cellSize, halftone, halftone));
 							}
 							continue;
 						}
@@ -111,9 +115,44 @@ namespace QRCodeArt.WinForm {
 							if (qr[x, y].Value) {
 								g.FillRectangle(fixedBlackBrush, new Rectangle(drawX * cellSize, drawY * cellSize, cellSize, cellSize));
 							} else {
-								// g.FillRectangle(fixedWhiteBrush, new Rectangle(drawX * cellSize, drawY * cellSize, cellSize, cellSize));
+								g.FillRectangle(fixedWhiteBrush, new Rectangle(drawX * cellSize, drawY * cellSize, cellSize, cellSize));
 							}
 						} else if (!pixels[x, y].HasFlag(ImagePixel.Stable) || qr[x, y].Value != pixels[x, y].HasFlag(ImagePixel.Black)) {
+							var brush = qr[x, y].Value ? blackBrush : whiteBrush;
+							g.FillRectangle(brush, new Rectangle(drawX * cellSize + halftone, drawY * cellSize + halftone, halftone, halftone));
+						}
+					}
+				}
+			}
+
+			var bitmap2 = new Bitmap((N + 2) * cellSize, (N + 2) * cellSize);
+			using (var g = Graphics.FromImage(bitmap2)) {
+				g.Clear(Color.White);
+				g.DrawImage(template, new Rectangle(cellSize, cellSize, N * cellSize, N * cellSize));
+				for (int x = 0; x < N; x++) {
+					for (int y = 0; y < N; y++) {
+						var drawX = x + 1;
+						var drawY = y + 1;
+
+						if (margin == 0) {
+							if (qr[x, y].Value) {
+								g.FillRectangle(blackBrush, new Rectangle(drawX * cellSize, drawY * cellSize, halftone, halftone));
+							} else {
+								g.FillRectangle(whiteBrush, new Rectangle(drawX * cellSize, drawY * cellSize, halftone, halftone));
+							}
+							continue;
+						}
+
+						if (qr[x, y].Type == QRValueType.TimingPatterns) continue;
+
+						//if (qr[x, y].Type == QRValueType.Fixed || qr[x, y].Type == QRValueType.TimingPatterns || qr[x, y].Type == QRValueType.Format || qr[x, y].Type == QRValueType.Version) {
+						if (qr[x, y].Type == QRValueType.Fixed || qr[x, y].Type == QRValueType.TimingPatterns) {
+							if (qr[x, y].Value) {
+								g.FillRectangle(fixedBlackBrush, new Rectangle(drawX * cellSize, drawY * cellSize, cellSize, cellSize));
+							} else {
+								g.FillRectangle(fixedWhiteBrush, new Rectangle(drawX * cellSize, drawY * cellSize, cellSize, cellSize));
+							}
+						} else {
 							if (qr[x, y].Value) {
 								g.FillRectangle(blackBrush, new Rectangle(drawX * cellSize + halftone, drawY * cellSize + halftone, halftone, halftone));
 							} else {
@@ -124,7 +163,51 @@ namespace QRCodeArt.WinForm {
 				}
 			}
 
+
+			var (binarizerBtimap, pixels2) = QRCodeMagician.GetBinarizer(version, template, cellSize, halftone, deviation);
+			qr = QRCodeMagician.ImageArt(dataMode.Value, version, eccLevel, maskVersion, data, pixels2, maxError);
+			var bitmap3 = new Bitmap((N + 2) * cellSize, (N + 2) * cellSize);
+			using (var g = Graphics.FromImage(bitmap3)) {
+				g.Clear(Color.White);
+				g.DrawImage((binarizerBtimap), new Rectangle(cellSize, cellSize, N * cellSize, N * cellSize));
+				for (int x = 0; x < N; x++) {
+					for (int y = 0; y < N; y++) {
+						var drawX = x + 1;
+						var drawY = y + 1;
+
+						if (margin == 0) {
+							if (qr[x, y].Value) {
+								g.FillRectangle(blackBrush, new Rectangle(drawX * cellSize, drawY * cellSize, halftone, halftone));
+							} else {
+								g.FillRectangle(whiteBrush, new Rectangle(drawX * cellSize, drawY * cellSize, halftone, halftone));
+							}
+							continue;
+						}
+
+						// if (qr[x, y].Type == QRValueType.TimingPatterns) continue;
+
+						if (qr[x, y].Type == QRValueType.Fixed || qr[x, y].Type == QRValueType.TimingPatterns) {
+							if (qr[x, y].Value) {
+								g.FillRectangle(fixedBlackBrush, new Rectangle(drawX * cellSize, drawY * cellSize, cellSize, cellSize));
+							} else {
+								g.FillRectangle(fixedWhiteBrush, new Rectangle(drawX * cellSize, drawY * cellSize, cellSize, cellSize));
+							}
+						} else if (!pixels2[x, y].HasFlag(ImagePixel.Stable) || qr[x, y].Value != pixels2[x, y].HasFlag(ImagePixel.Black)) {
+							if (qr[x, y].Value) {
+								g.FillRectangle(blackBrush, new Rectangle(drawX * cellSize + halftone, drawY * cellSize + halftone, halftone, halftone));
+							} else {
+								g.FillRectangle(whiteBrush, new Rectangle(drawX * cellSize + halftone, drawY * cellSize + halftone, halftone, halftone));
+							}
+						}
+					}
+				}
+			}
+
+			WindowManager<FrmView>.Get().Text = $"最大允许错误：{qr.MaxErrorAllowBytes}×{QRInfo.GetEccInfo(version, eccLevel).BlocksInGroup1 + QRInfo.GetEccInfo(version, eccLevel).BlocksInGroup2}";
 			WindowManager<FrmView>.Get().picView.Image = bitmap;
+			WindowManager<FrmView>.Get().picView2.Image = bitmap2;
+			WindowManager<FrmView>.Get().picView3.Image = HybridBinarizer.BinarizerBitmap(bitmap);
+			WindowManager<FrmView>.Get().picView4.Image = bitmap3;
 			WindowManager<FrmView>.Get().Show();
 		}
 	}

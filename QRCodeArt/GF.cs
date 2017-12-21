@@ -43,10 +43,8 @@ namespace QRCodeArt {
 			}
 		}
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static GF FromExponent(int exponent) => new GF { Polynom = AlphaTable[exponent + 1] };
-
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		
 		public static GF FromPolynom(int polynom) => new GF { Polynom = polynom };
 
 		public readonly static GF Zero = new GF();
@@ -60,8 +58,7 @@ namespace QRCodeArt {
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static GF operator +(GF left, GF right)
 			=> FromPolynom(left.Polynom ^ right.Polynom);
-
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		
 		public static GF operator *(GF left, GF right) {
 			if (left.IsZero || right.IsZero) return Zero;
 			var add = left.Exponent + right.Exponent;

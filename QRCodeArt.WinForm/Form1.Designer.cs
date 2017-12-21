@@ -47,6 +47,8 @@
 			this.label9 = new System.Windows.Forms.Label();
 			this.numBlackThreshold = new System.Windows.Forms.NumericUpDown();
 			this.label10 = new System.Windows.Forms.Label();
+			this.numDeviation = new System.Windows.Forms.NumericUpDown();
+			this.label11 = new System.Windows.Forms.Label();
 			((System.ComponentModel.ISupportInitialize)(this.picTemplate)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.numVersion)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.numCellSize)).BeginInit();
@@ -54,6 +56,7 @@
 			((System.ComponentModel.ISupportInitialize)(this.numMaxError)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.numWhiteThreshold)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.numBlackThreshold)).BeginInit();
+			((System.ComponentModel.ISupportInitialize)(this.numDeviation)).BeginInit();
 			this.SuspendLayout();
 			// 
 			// picTemplate
@@ -232,7 +235,7 @@
 			this.numCellSize.Size = new System.Drawing.Size(121, 21);
 			this.numCellSize.TabIndex = 14;
 			this.numCellSize.Value = new decimal(new int[] {
-            5,
+            6,
             0,
             0,
             0});
@@ -248,6 +251,11 @@
 			this.numHalftone.Name = "numHalftone";
 			this.numHalftone.Size = new System.Drawing.Size(121, 21);
 			this.numHalftone.TabIndex = 16;
+			this.numHalftone.Value = new decimal(new int[] {
+            2,
+            0,
+            0,
+            0});
 			// 
 			// label7
 			// 
@@ -286,7 +294,7 @@
 			// 
 			// numWhiteThreshold
 			// 
-			this.numWhiteThreshold.Location = new System.Drawing.Point(471, 158);
+			this.numWhiteThreshold.Location = new System.Drawing.Point(14, 328);
 			this.numWhiteThreshold.Maximum = new decimal(new int[] {
             255,
             0,
@@ -300,19 +308,21 @@
             0,
             0,
             0});
+			this.numWhiteThreshold.Visible = false;
 			// 
 			// label9
 			// 
 			this.label9.AutoSize = true;
-			this.label9.Location = new System.Drawing.Point(469, 143);
+			this.label9.Location = new System.Drawing.Point(12, 313);
 			this.label9.Name = "label9";
 			this.label9.Size = new System.Drawing.Size(53, 12);
 			this.label9.TabIndex = 21;
 			this.label9.Text = "白阈值：";
+			this.label9.Visible = false;
 			// 
 			// numBlackThreshold
 			// 
-			this.numBlackThreshold.Location = new System.Drawing.Point(471, 119);
+			this.numBlackThreshold.Location = new System.Drawing.Point(14, 289);
 			this.numBlackThreshold.Maximum = new decimal(new int[] {
             255,
             0,
@@ -326,21 +336,51 @@
             0,
             0,
             0});
+			this.numBlackThreshold.Visible = false;
 			// 
 			// label10
 			// 
 			this.label10.AutoSize = true;
-			this.label10.Location = new System.Drawing.Point(469, 104);
+			this.label10.Location = new System.Drawing.Point(12, 274);
 			this.label10.Name = "label10";
 			this.label10.Size = new System.Drawing.Size(53, 12);
 			this.label10.TabIndex = 19;
 			this.label10.Text = "黑阈值：";
+			this.label10.Visible = false;
+			// 
+			// numDeviation
+			// 
+			this.numDeviation.Location = new System.Drawing.Point(471, 119);
+			this.numDeviation.Maximum = new decimal(new int[] {
+            255,
+            0,
+            0,
+            0});
+			this.numDeviation.Name = "numDeviation";
+			this.numDeviation.Size = new System.Drawing.Size(121, 21);
+			this.numDeviation.TabIndex = 22;
+			this.numDeviation.Value = new decimal(new int[] {
+            16,
+            0,
+            0,
+            0});
+			// 
+			// label11
+			// 
+			this.label11.AutoSize = true;
+			this.label11.Location = new System.Drawing.Point(469, 104);
+			this.label11.Name = "label11";
+			this.label11.Size = new System.Drawing.Size(41, 12);
+			this.label11.TabIndex = 23;
+			this.label11.Text = "误差：";
 			// 
 			// Form1
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.ClientSize = new System.Drawing.Size(607, 266);
+			this.ClientSize = new System.Drawing.Size(607, 265);
+			this.Controls.Add(this.label11);
+			this.Controls.Add(this.numDeviation);
 			this.Controls.Add(this.numWhiteThreshold);
 			this.Controls.Add(this.label9);
 			this.Controls.Add(this.numBlackThreshold);
@@ -376,6 +416,7 @@
 			((System.ComponentModel.ISupportInitialize)(this.numMaxError)).EndInit();
 			((System.ComponentModel.ISupportInitialize)(this.numWhiteThreshold)).EndInit();
 			((System.ComponentModel.ISupportInitialize)(this.numBlackThreshold)).EndInit();
+			((System.ComponentModel.ISupportInitialize)(this.numDeviation)).EndInit();
 			this.ResumeLayout(false);
 			this.PerformLayout();
 
@@ -407,6 +448,8 @@
 		private System.Windows.Forms.Label label9;
 		private System.Windows.Forms.NumericUpDown numBlackThreshold;
 		private System.Windows.Forms.Label label10;
+		private System.Windows.Forms.NumericUpDown numDeviation;
+		private System.Windows.Forms.Label label11;
 	}
 }
 

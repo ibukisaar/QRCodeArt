@@ -13,5 +13,12 @@ namespace QRCodeArt.WinForm {
 		public FrmView() {
 			InitializeComponent();
 		}
+
+		private void picView_Click(object sender, EventArgs e) {
+			var result = saveFileDialog1.ShowDialog();
+			if (result == DialogResult.OK) {
+				((sender as PictureBox).Image as Bitmap).Save(saveFileDialog1.FileName);
+			}
+		}
 	}
 }

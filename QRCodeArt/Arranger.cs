@@ -82,12 +82,12 @@ namespace QRCodeArt {
 		}
 
 		public static (T[] Data, T[] Ecc)[] GetBlocks<T>(int version, ECCLevel level, IEnumerable<T> dataIterator = null, bool withEcc = true) {
-			var info = QRDataEncoder.GetEccInfo(version, level);
+			var info = QRInfo.GetEccInfo(version, level);
 			return GetBlocks(info.BlocksInGroup1, info.CodewordsInGroup1, info.BlocksInGroup2, info.CodewordsInGroup2, info.ECCPerBytes, 1, dataIterator, withEcc);
 		}
 
 		public static (T[] Data, T[] Ecc)[] GetBitBlocks<T>(int version, ECCLevel level, IEnumerable<T> dataIterator = null, bool withEcc = true) {
-			var info = QRDataEncoder.GetEccInfo(version, level);
+			var info = QRInfo.GetEccInfo(version, level);
 			return GetBlocks(info.BlocksInGroup1, info.CodewordsInGroup1 * 8, info.BlocksInGroup2, info.CodewordsInGroup2 * 8, info.ECCPerBytes * 8, 8, dataIterator, withEcc);
 		}
 

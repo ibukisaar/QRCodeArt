@@ -144,7 +144,7 @@ namespace QRCodeArt.Console {
 
 			int version = 20;
 			byte[] data1 = Encoding.UTF8.GetBytes("我草！");
-			var N = QRCode.GetN(version);
+			var N = QRInfo.GetN(version);
 			int padding = 6;
 			// byte[] data1 = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 			var pixels = new ImagePixel[N, N];
@@ -189,10 +189,10 @@ namespace QRCodeArt.Console {
 
 			int cellSize = 5;
 			pixels = QRCodeMagician.GetImagePixel(version, new Bitmap(@"Z:\1.png"), cellSize);
-			var qr = QRCodeMagician.ImageArt(QRDataMode.Byte, version, ECCLevel.L, MaskVersion.Version100, data1, pixels, QRDataEncoder.GetMaxErrorAllowBytes(version, ECCLevel.L) / 2);
+			var qr = QRCodeMagician.ImageArt(DataMode.Byte, version, ECCLevel.L, MaskVersion.Version100, data1, pixels, QRInfo.GetMaxErrorAllowBytes(version, ECCLevel.L) / 2);
 			Save(@"Z:\art.png", qr, null, cellSize);
 
-			var qr2 = QRCodeMagician.ImageArt(QRDataMode.Byte, version, ECCLevel.L, MaskVersion.Version100, data1, pixels);
+			var qr2 = QRCodeMagician.ImageArt(DataMode.Byte, version, ECCLevel.L, MaskVersion.Version100, data1, pixels);
 			Save(@"Z:\art2.png", qr2, null, cellSize);
 
 			//var bits = new BitSet(1000);

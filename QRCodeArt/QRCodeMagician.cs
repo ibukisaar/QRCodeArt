@@ -38,12 +38,12 @@ namespace QRCodeArt {
 		public static (QRCode QRCode1, QRCode QRCode2, bool Swap) CreateObfuscatedQRCode(byte[] data1, byte[] data2) {
 			for (int level = 0; level < 4; level++) {
 				var eccLevel = (ECCLevel) level;
-				var mode1 = QRDataEncoder.GuessMode(data1);
+				var mode1 = DataEncoder.GuessMode(data1);
 				while (true) {
-					var mode2 = QRDataEncoder.GuessMode(data2);
+					var mode2 = DataEncoder.GuessMode(data2);
 					while (true) {
-						var ver1 = QRDataEncoder.GuessVersion(data1.Length, eccLevel, mode1);
-						var ver2 = QRDataEncoder.GuessVersion(data2.Length, eccLevel, mode2);
+						var ver1 = DataEncoder.GuessVersion(data1.Length, eccLevel, mode1);
+						var ver2 = DataEncoder.GuessVersion(data2.Length, eccLevel, mode2);
 						var ver = Math.Max(ver1, ver2);
 						for (; ver <= 40; ver++) {
 							for (int mask1 = 0; mask1 < 8; mask1++) {
@@ -91,9 +91,9 @@ namespace QRCodeArt {
 		}
 
 		static readonly int[] modeIndexes = { -1, 0, 1, 2, -1, -1, -1, -1 };
-		static readonly QRDataMode[] sortedModeTable = { QRDataMode.Numeric, QRDataMode.Alphanumeric, QRDataMode.Byte };
+		static readonly DataMode[] sortedModeTable = { DataMode.Numeric, DataMode.Alphanumeric, DataMode.Byte };
 
-		private static bool NextMode(QRDataMode mode, out QRDataMode result) {
+		private static bool NextMode(DataMode mode, out DataMode result) {
 			var i = modeIndexes[(int) mode];
 			if (i < 0 || i + 1 >= sortedModeTable.Length) {
 				result = 0;
@@ -129,12 +129,12 @@ namespace QRCodeArt {
 			}
 		}
 
-		public static QRCode ImageArt(QRDataMode mode, int version, ECCLevel level, MaskVersion mask, byte[] data, ImagePixel[,] pixels, int maxErrorNumber = 0) {
+		public static QRCode ImageArt(DataMode mode, int version, ECCLevel level, MaskVersion mask, byte[] data, ImagePixel[,] pixels, int maxErrorNumber = 0) {
 			var qr = QRCode.AnalysisImageArt(version, mode, data, level, mask);
 			var encodedBytes = qr.Encoder.Encode(data, 0, data.Length, false, false);
 			var validBits = qr.Encoder.GetDataBitCount(data.Length);
 
-			var flags = new BitType[qr.Encoder.TotalBytes * 8];
+			var flags = new BitType[QRInfo.GetTotalBytes(version, level) * 8];
 			var pixelArray = qr.BitmapDataToArray(pixels);
 			for (int i = 0; i < flags.Length; i++) {
 				if (pixelArray[i].HasFlag(ImagePixel.Any)) {
@@ -198,35 +198,70 @@ namespace QRCodeArt {
 			if (maxErrorNumber == 0) {
 				qr.WriteData(Arranger.Interlock(tempResult));
 			} else { // 如果允许错误，那么将调整某些字节和图像一致
-				maxErrorNumber = Math.Min(maxErrorNumber, qr.MaxErrorAllowBytes);
+				if (maxErrorNumber < 0 || maxErrorNumber > qr.MaxErrorAllowBytes)
+					maxErrorNumber = qr.MaxErrorAllowBytes;
 
 				Xor(tempResult, qr.AnalysisGroup); // outBlocks = outBlocks ^ mask
 				var imageBlocks = Arranger.GetBlocks(version, level, Arranger.ToByteArray(templateArray));
-				var typeFlagsBlocks = Arranger.GetBlocks(version, level, Arranger.ToByteArray(Array.ConvertAll(pixelArray, p => !p.HasFlag(ImagePixel.Any))));
+				var anyFlagsBlocks = Arranger.GetBlocks(version, level, Arranger.ToByteArray(Array.ConvertAll(pixelArray, p => !p.HasFlag(ImagePixel.Any))));
+				var unstableFlagsBlocks = Arranger.GetBlocks(version, level, Arranger.ToByteArray(Array.ConvertAll(pixelArray, p => (p & (ImagePixel.Stable | ImagePixel.Any)) == 0)));
+				var points = qr.GetDataRegionPoints().Select(args => (args.X, args.Y));
+				var pointBlocks = Arranger.GetBitBlocks(version, level, points);
+
 				for (int i = 0; i < tempResult.Length; i++) {
 					int dataLength = tempResult[i].Data.Length;
 					int eccLength = tempResult[i].Ecc.Length;
-					var errorTable = new(int Index, int Score)[dataLength + eccLength];
+					var errorTable = new(int Index, bool Unstable, int Score)[dataLength + eccLength];
 					for (int j = 0; j < errorTable.Length; j++) errorTable[j].Index = j;
 
 					for (int j = 0; j < dataLength; j++) {
 						byte diff = (byte) (tempResult[i].Data[j] ^ imageBlocks[i].Data[j]);
 						errorTable[j].Score = BitCount(diff);
-						diff &= typeFlagsBlocks[i].Data[j];
-						errorTable[j].Score += 8 * BitCount(diff);
+						var unstableCount = BitCount(unstableFlagsBlocks[i].Data[j]);
+						if (unstableCount == 0) {
+							diff &= anyFlagsBlocks[i].Data[j];
+							errorTable[j].Score += 8 * BitCount(diff);
+						} else {
+							errorTable[j].Score += 64 * unstableCount;
+							errorTable[j].Unstable = true;
+						}
 					}
 					for (int j = 0; j < eccLength; j++) {
 						byte diff = (byte) (tempResult[i].Ecc[j] ^ imageBlocks[i].Ecc[j]);
 						errorTable[dataLength + j].Score = BitCount(diff);
-						diff &= typeFlagsBlocks[i].Ecc[j];
-						errorTable[dataLength + j].Score += 8 * BitCount(diff);
+						var unstableCount = BitCount(unstableFlagsBlocks[i].Ecc[j]);
+						if (unstableCount == 0) {
+							diff &= anyFlagsBlocks[i].Ecc[j];
+							errorTable[dataLength + j].Score += 8 * BitCount(diff);
+						} else {
+							errorTable[j].Score += 64 * unstableCount;
+							errorTable[j].Unstable = true;
+						}
 					}
 
-					foreach (var (index, _) in errorTable.OrderByDescending(p => p.Score).Take(maxErrorNumber)) {
+					foreach (var (index, unstable, _) in errorTable.OrderByDescending(p => p.Score).Take(maxErrorNumber)) {
+						int subIndex;
+						byte[] subResult, subImage;
+						(int X, int Y)[] subPoints;
 						if (index < dataLength) {
-							tempResult[i].Data[index] = imageBlocks[i].Data[index];
+							subIndex = index;
+							subResult = tempResult[i].Data;
+							subImage = imageBlocks[i].Data;
+							subPoints = pointBlocks[i].Data;
 						} else {
-							tempResult[i].Ecc[index - dataLength] = imageBlocks[i].Ecc[index - dataLength];
+							subIndex = index - dataLength;
+							subResult = tempResult[i].Ecc;
+							subImage = imageBlocks[i].Ecc;
+							subPoints = pointBlocks[i].Ecc;
+						}
+
+						if (unstable) {
+							for (int k = 0; k < 8; k++) {
+								var (x, y) = subPoints[subIndex * 8 + k];
+								pixels[x, y] |= ImagePixel.Stable;
+							}
+						} else {
+							subResult[subIndex] = subImage[subIndex];
 						}
 					}
 				}
@@ -409,9 +444,14 @@ namespace QRCodeArt {
 			return colIndexes;
 		}
 
-		unsafe public static ImagePixel[,] GetImagePixel(int version, Bitmap bitmap, int cellSize, int blackThreshold = 64, int whiteThreshold = 192, int halftoneSize = 0) {
-			int N = QRCode.GetN(version);
+		unsafe public static ImagePixel[,] GetImagePixel(int version, Bitmap bitmap, int cellSize, int halftoneSize = 0, int deviation = 16) {
+			const int RWeight = 19595;
+			const int GWeight = 38470;
+			const int BWeight = 7471;
+
+			int N = QRInfo.GetN(version);
 			bitmap = new Bitmap(bitmap, N * cellSize, N * cellSize);
+			var thresholds = HybridBinarizer.GetThreshold(bitmap);
 			var bitmapData = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
 			var p = (uint*) bitmapData.Scan0;
 			var W = N * cellSize;
@@ -419,29 +459,75 @@ namespace QRCodeArt {
 			if (halftoneSize <= 0 || halftoneSize > cellSize) halftoneSize = cellSize;
 			var margin = (cellSize - halftoneSize) / 2;
 			int baseCount = halftoneSize * halftoneSize;
-			int centerThreshold = (blackThreshold + whiteThreshold) / 2;
 
 			for (int y = 0; y < N; y++) {
 				for (int x = 0; x < N; x++) {
-					int gray = 0;
-					var alpha = 0;
+					bool whiteStable = true, blackStable = true;
+					int graySum = 0;
+					int alpha = 0;
+					int thresholdSum = 0;
 					var px = x * cellSize;
 					var py = y * cellSize;
 					for (int y0 = margin; y0 < margin + halftoneSize; y0++) {
 						for (int x0 = margin; x0 < margin + halftoneSize; x0++) {
 							var pix = (byte*) &p[(py + y0) * W + (px + x0)];
-							gray += (pix[2] * 38 + pix[1] * 75 + pix[0] * 15) >> 7;
+							int g = (pix[2] * RWeight + pix[1] * GWeight + pix[0] * BWeight) >> 16;
+							int t = thresholds[px + x0, py + y0];
 							// gray += (pix[2] + pix[1] + pix[0]) / 3;
+							graySum += g;
 							alpha += pix[3];
+							thresholdSum += t;
+
+							if (g < t + deviation) whiteStable = false;
+							if (g > t - deviation) blackStable = false;
 						}
 					}
-					result[x, y] = gray >= centerThreshold * baseCount ? ImagePixel.White : ImagePixel.Black;
+					result[x, y] = graySum > thresholdSum ? ImagePixel.White : ImagePixel.Black;
 					if (alpha < 128 * baseCount) result[x, y] = ImagePixel.Any | ImagePixel.White;
-					if (gray <= blackThreshold * baseCount || gray >= whiteThreshold * baseCount) result[x, y] |= ImagePixel.Stable;
+					else if (whiteStable || blackStable) result[x, y] |= ImagePixel.Stable;
 				}
 			}
 
 			return result;
+		}
+
+		unsafe public static (Bitmap BinarizerBitmap, ImagePixel[,] Pixels) GetBinarizer(int version, Bitmap bitmap, int cellSize, int halftoneSize = 0, int deviation = 5) {
+			int N = QRInfo.GetN(version);
+			int W = N * cellSize;
+			if (halftoneSize <= 0 || halftoneSize > cellSize) halftoneSize = cellSize;
+			var margin = (cellSize - halftoneSize) / 2;
+			int baseCount = halftoneSize * halftoneSize;
+			bitmap = new Bitmap(bitmap, W, W);
+			var binarizer = HybridBinarizer.BinarizerBitmap(bitmap);
+			var data = bitmap.LockBits(new Rectangle(0, 0, W, W), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
+			var binarizerData = binarizer.LockBits(new Rectangle(0, 0, W, W), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
+			uint* alpha = (uint*) (data.Scan0 + 3);
+			uint* p = (uint*) binarizerData.Scan0;
+			var result = new ImagePixel[N, N];
+
+			for (int y = 0; y < N; y++) {
+				for (int x = 0; x < N; x++) {
+					int blackSum = 0;
+					int alphaSum = 0;
+					var px = x * cellSize;
+					var py = y * cellSize;
+					for (int y0 = margin; y0 < margin + halftoneSize; y0++) {
+						for (int x0 = margin; x0 < margin + halftoneSize; x0++) {
+							var pix = (byte*) &p[(py + y0) * W + (px + x0)];
+							if (pix[0] <= 10) blackSum++;
+							alphaSum += *(byte*) &alpha[(py + y0) * W + (px + x0)];
+						}
+					}
+
+					result[x, y] = blackSum * 2 < baseCount ? ImagePixel.Black : ImagePixel.White;
+					if (alphaSum < 128 * baseCount) result[x, y] = ImagePixel.Any | ImagePixel.White;
+					else if (Math.Abs(blackSum * 2 - baseCount) >= deviation) result[x, y] |= ImagePixel.Stable;
+				}
+			}
+
+			bitmap.UnlockBits(data);
+			binarizer.UnlockBits(binarizerData);
+			return (binarizer, result);
 		}
 	}
 }

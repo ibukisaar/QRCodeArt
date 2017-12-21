@@ -54,6 +54,7 @@
     <Compile Include="BitSet.cs" />
     <Compile Include="ByteEncoder.cs" />
     <Compile Include="Cache.cs" />
+    <Compile Include="HybridBinarizer.cs" />
     <Compile Include="ImagePixel.cs" />
     <Compile Include="OverlayAnalyzer.cs" />
     <Compile Include="ECCLevel.cs" />
@@ -63,8 +64,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="QRCode.cs" />
     <Compile Include="QRCodeMagician.cs" />
-    <Compile Include="QRDataMode.cs" />
-    <Compile Include="QRDataEncoder.cs" />
+    <Compile Include="DataMode.cs" />
+    <Compile Include="DataEncoder.cs" />
+    <Compile Include="QRInfo.cs" />
     <Compile Include="QRPaintEventArgs.cs" />
     <Compile Include="QRSurface.cs" />
     <Compile Include="QRValue.cs" />

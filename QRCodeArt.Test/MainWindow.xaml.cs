@@ -35,8 +35,8 @@ namespace QRCodeArt.Test {
 			//qrCanvas1.QRSurface = new QRSurface(qr, 5);
 
 			
-			var pixels = new ImagePixel[QRCode.GetN(7), QRCode.GetN(7)];
-			var qr = QRCodeMagician.ImageArt(QRDataMode.Byte, 7, ECCLevel.L, MaskVersion.Version000, data1, pixels);
+			var pixels = new ImagePixel[QRInfo.GetN(7), QRInfo.GetN(7)];
+			var qr = QRCodeMagician.ImageArt(DataMode.Byte, 7, ECCLevel.L, MaskVersion.Version000, data1, pixels);
 			qrCanvas1.QRSurface = new QRSurface(qr, 5);
 		}
 	}

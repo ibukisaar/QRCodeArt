@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace QRCodeArt {
 	public class QRCode {
 		private QRValue[,] valueMap;
-		private QRDataEncoder encoder;
+		private DataEncoder encoder;
 		private (byte[] Data, byte[] Ecc)[] analysisGroup;
 		private int formatBinary;
 		private int maxErrorAllowBytes;
@@ -18,17 +18,17 @@ namespace QRCodeArt {
 		/// <code><see cref="ValueMap"/>[x,y]</code>
 		/// </summary>
 		//public bool[,] ValueMap { get; }
-		public QRDataMode DataMode { get; }
+		public DataMode DataMode { get; }
 		public ECCLevel ECCLevel { get; }
 		public MaskVersion MaskVersion { get; }
 		public int FormatBinary => formatBinary;
 		public int MaxErrorAllowBytes => maxErrorAllowBytes;
 		public (byte[] Data, byte[] Ecc)[] AnalysisGroup => analysisGroup;
-		public QRDataEncoder Encoder => encoder;
+		public DataEncoder Encoder => encoder;
 
 		public ref QRValue this[int x, int y] => ref valueMap[x, y];
 
-		public QRCode(int version, QRDataMode dataMode, byte[] data, ECCLevel eccLevel = ECCLevel.L, MaskVersion maskVersion = MaskVersion.Version000)
+		public QRCode(int version, DataMode dataMode, byte[] data, ECCLevel eccLevel = ECCLevel.L, MaskVersion maskVersion = MaskVersion.Version000)
 			: this(version, dataMode, data, eccLevel, maskVersion, AnalysisType.None) {
 		}
 
@@ -36,10 +36,10 @@ namespace QRCodeArt {
 			: this(0, null, data, eccLevel, maskVersion, AnalysisType.None) {
 		}
 
-		private QRCode(int version, QRDataMode? dataMode, byte[] data, ECCLevel eccLevel, MaskVersion maskVersion, AnalysisType analysisType) {
-			DataMode = dataMode ?? QRDataEncoder.GuessMode(data);
-			Version = version < 1 || version > 40 ? QRDataEncoder.GuessVersion(data.Length, eccLevel, DataMode) : version;
-			N = GetN(version);
+		private QRCode(int version, DataMode? dataMode, byte[] data, ECCLevel eccLevel, MaskVersion maskVersion, AnalysisType analysisType) {
+			DataMode = dataMode ?? DataEncoder.GuessMode(data);
+			Version = version < 1 || version > 40 ? DataEncoder.GuessVersion(data.Length, eccLevel, DataMode) : version;
+			N = QRInfo.GetN(version);
 			ECCLevel = eccLevel;
 			MaskVersion = maskVersion;
 
@@ -47,11 +47,9 @@ namespace QRCodeArt {
 			Init(data, analysisType);
 		}
 
-		public static int GetN(int version) => (version - 1) * 4 + 21;
-
 		private void Init(byte[] data, AnalysisType analysis) {
-			encoder = QRDataEncoder.CreateEncoder(DataMode, Version, ECCLevel);
-			maxErrorAllowBytes = QRDataEncoder.GetMaxErrorAllowBytes(Version, ECCLevel);
+			encoder = DataEncoder.CreateEncoder(DataMode, Version, ECCLevel);
+			maxErrorAllowBytes = QRInfo.GetMaxErrorAllowBytes(Version, ECCLevel);
 
 			SetPositionDetectionPattern();
 			SetAlignmentPatterns();
@@ -61,7 +59,7 @@ namespace QRCodeArt {
 			SetFlags(data.Length);
 
 			if (analysis == AnalysisType.ImageArt) {
-				analysisGroup = GetMaskGroupBytes(encoder.TotalBytes * 8);
+				analysisGroup = GetMaskGroupBytes(QRInfo.GetTotalBytes(Version, ECCLevel) * 8);
 			} else {
 				var dataGroups = encoder.Encode(data, 0, data.Length);
 				if (analysis == AnalysisType.None) {
@@ -76,7 +74,7 @@ namespace QRCodeArt {
 						}
 					}
 
-					analysisGroup = GetMaskGroupBytes(encoder.TotalBytes * 8);
+					analysisGroup = GetMaskGroupBytes(QRInfo.GetTotalBytes(Version, ECCLevel) * 8);
 					for (int i = 0; i < analysisGroup.Length; i++) {
 						Xor(analysisGroup[i].Data, dataGroups[i].Data);
 						Xor(analysisGroup[i].Ecc, dataGroups[i].Ecc);
@@ -87,8 +85,8 @@ namespace QRCodeArt {
 
 		private void SetFlags(int dataLength) {
 			var dataTotalBits = encoder.GetDataBitCount(dataLength);
-			var dataPaddingTotalBits = QRDataEncoder.GetDataCapacityInfo(Version, ECCLevel).NumberOfDataBytes * 8 - dataTotalBits;
-			var eccTotalBits = QRDataEncoder.GetTotalEccBytes(Version, ECCLevel) * 8;
+			var dataPaddingTotalBits = QRInfo.GetDataCapacityInfo(Version, ECCLevel).NumberOfDataBytes * 8 - dataTotalBits;
+			var eccTotalBits = QRInfo.GetTotalEccBytes(Version, ECCLevel) * 8;
 
 			var dataCounter = 0;
 			var dataPaddingCounter = 0;
@@ -318,6 +316,9 @@ namespace QRCodeArt {
 			}
 		}
 
+		public IEnumerable<(int I, int X, int Y)> GetDataRegionPoints()
+			=> GetPoints(QRInfo.GetTotalBytes(Version, ECCLevel) * 8, QRValueType.Data, QRValueType.DataPadding, QRValueType.Ecc, QRValueType.Padding, QRValueType.Unused);
+
 		private void SetData(byte[] data) {
 			var bits = new BitSet(data);
 			foreach (var (i, x, y) in GetPoints(bits.Count, QRValueType.Unused, QRValueType.Data, QRValueType.DataPadding, QRValueType.Ecc)) {
@@ -366,14 +367,14 @@ namespace QRCodeArt {
 		}
 
 		public T[] BitmapDataToArray<T>(T[,] bitmapData) {
-			var result = new T[encoder.TotalBytes * 8];
-			foreach (var (i, x, y) in GetPoints(result.Length, QRValueType.Data, QRValueType.DataPadding, QRValueType.Ecc, QRValueType.Padding, QRValueType.Unused)) {
+			var result = new T[QRInfo.GetTotalBytes(Version, ECCLevel) * 8];
+			foreach (var (i, x, y) in GetDataRegionPoints()) {
 				result[i] = bitmapData[x, y];
 			}
 			return result;
 		}
 
-		public static QRCode AnalysisOverlay(int version, QRDataMode dataMode, byte[] data, ECCLevel eccLevel, MaskVersion maskVersion) {
+		public static QRCode AnalysisOverlay(int version, DataMode dataMode, byte[] data, ECCLevel eccLevel, MaskVersion maskVersion) {
 			return new QRCode(version, dataMode, data, eccLevel, maskVersion, AnalysisType.Overlay);
 		}
 
@@ -381,7 +382,7 @@ namespace QRCodeArt {
 			return new QRCode(0, null, data, eccLevel, maskVersion, AnalysisType.Overlay);
 		}
 
-		public static QRCode AnalysisImageArt(int version, QRDataMode dataMode, byte[] data, ECCLevel eccLevel, MaskVersion maskVersion) {
+		public static QRCode AnalysisImageArt(int version, DataMode dataMode, byte[] data, ECCLevel eccLevel, MaskVersion maskVersion) {
 			return new QRCode(version, dataMode, data, eccLevel, maskVersion, AnalysisType.ImageArt);
 		}
 	}
