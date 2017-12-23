@@ -207,6 +207,7 @@ namespace QRCodeArt {
 				var unstableFlagsBlocks = Arranger.GetBlocks(version, level, Arranger.ToByteArray(Array.ConvertAll(pixelArray, p => (p & (ImagePixel.Stable | ImagePixel.Any)) == 0)));
 				var points = qr.GetDataRegionPoints().Select(args => (args.X, args.Y));
 				var pointBlocks = Arranger.GetBitBlocks(version, level, points);
+				const int NormalWeight = 1, AnyFlagWeight = 4, UnstableWeight = 16;
 
 				for (int i = 0; i < tempResult.Length; i++) {
 					int dataLength = tempResult[i].Data.Length;
@@ -216,25 +217,25 @@ namespace QRCodeArt {
 
 					for (int j = 0; j < dataLength; j++) {
 						byte diff = (byte) (tempResult[i].Data[j] ^ imageBlocks[i].Data[j]);
-						errorTable[j].Score = BitCount(diff);
+						errorTable[j].Score = NormalWeight * BitCount(diff);
 						var unstableCount = BitCount(unstableFlagsBlocks[i].Data[j]);
 						if (unstableCount == 0) {
 							diff &= anyFlagsBlocks[i].Data[j];
-							errorTable[j].Score += 8 * BitCount(diff);
+							errorTable[j].Score += AnyFlagWeight * BitCount(diff);
 						} else {
-							errorTable[j].Score += 64 * unstableCount;
+							errorTable[j].Score += UnstableWeight * unstableCount;
 							errorTable[j].Unstable = true;
 						}
 					}
 					for (int j = 0; j < eccLength; j++) {
 						byte diff = (byte) (tempResult[i].Ecc[j] ^ imageBlocks[i].Ecc[j]);
 						errorTable[dataLength + j].Score = BitCount(diff);
-						var unstableCount = BitCount(unstableFlagsBlocks[i].Ecc[j]);
+						var unstableCount = NormalWeight * BitCount(unstableFlagsBlocks[i].Ecc[j]);
 						if (unstableCount == 0) {
 							diff &= anyFlagsBlocks[i].Ecc[j];
-							errorTable[dataLength + j].Score += 8 * BitCount(diff);
+							errorTable[dataLength + j].Score += AnyFlagWeight * BitCount(diff);
 						} else {
-							errorTable[j].Score += 64 * unstableCount;
+							errorTable[j].Score += UnstableWeight * unstableCount;
 							errorTable[j].Unstable = true;
 						}
 					}
