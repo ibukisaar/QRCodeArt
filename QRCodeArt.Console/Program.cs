@@ -143,7 +143,7 @@ namespace QRCodeArt.Console {
 			//System.Console.WriteLine();
 
 			int version = 20;
-			byte[] data1 = Encoding.UTF8.GetBytes("我草！");
+			byte[] data1 = Encoding.UTF8.GetBytes("0.0");
 			var N = QRInfo.GetN(version);
 			int padding = 6;
 			// byte[] data1 = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };

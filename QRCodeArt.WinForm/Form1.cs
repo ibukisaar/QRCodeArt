@@ -19,7 +19,7 @@ namespace QRCodeArt.WinForm {
 		}
 
 		private void btnOpen_Click(object sender, EventArgs e) {
-			openFileDialog1.Filter = "图片格式|*.jpg;*.png;*.gif;*.jpeg;*.bmp|*|所有文件";
+			openFileDialog1.Filter = "图片格式|*.jpg;*.png;*.gif;*.jpeg;*.bmp|所有文件|*";
 			var result = openFileDialog1.ShowDialog();
 			if (result == DialogResult.OK) {
 				try {

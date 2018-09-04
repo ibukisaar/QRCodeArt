@@ -489,6 +489,7 @@ namespace QRCodeArt {
 				}
 			}
 
+			bitmap.UnlockBits(bitmapData);
 			return result;
 		}
 

@@ -39,7 +39,7 @@ namespace QRCodeArt {
 		private QRCode(int version, DataMode? dataMode, byte[] data, ECCLevel eccLevel, MaskVersion maskVersion, AnalysisType analysisType) {
 			DataMode = dataMode ?? DataEncoder.GuessMode(data);
 			Version = version < 1 || version > 40 ? DataEncoder.GuessVersion(data.Length, eccLevel, DataMode) : version;
-			N = QRInfo.GetN(version);
+			N = QRInfo.GetN(Version);
 			ECCLevel = eccLevel;
 			MaskVersion = maskVersion;
 

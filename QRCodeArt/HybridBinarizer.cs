@@ -79,6 +79,7 @@ namespace QRCodeArt {
 			return thresholds;
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		static int Clamp(int value, int min, int max) {
 			return value < min ? min : value > max ? max : value;
 		}

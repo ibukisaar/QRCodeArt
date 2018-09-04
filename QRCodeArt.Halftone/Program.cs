@@ -15,7 +15,7 @@ namespace QRCodeArt.Halftone {
 			var N = QRInfo.GetN(version);
 			var maxError = QRInfo.GetMaxErrorAllowBytes(version, ECCLevel.L);
 			var template = new Bitmap(@"Z:\2.png");
-			var pixels = QRCodeMagician.GetImagePixel(version, template, cellSize, 140, 220, cellSize / 3);
+			var pixels = QRCodeMagician.GetImagePixel(version, template, cellSize, cellSize / 3);
 			var qr = QRCodeMagician.ImageArt(DataMode.Alphanumeric, version, ECCLevel.L, MaskVersion.Version100, data1, pixels, 4);
 			var bitmap = new Bitmap((N + 2) * cellSize, (N + 2) * cellSize);
 			// var bitmapData = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppRgb);

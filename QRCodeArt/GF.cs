@@ -25,8 +25,8 @@ namespace QRCodeArt {
 		//private const int PrimitivePolynom = 0b10011;
 		//private const int N = 15;
 
-		private static int[] AlphaTable = new int[N + 1];
-		private static int[] ExponentTable = new int[N + 1];
+		private readonly static int[] AlphaTable = new int[N + 1];
+		private readonly static int[] ExponentTable = new int[N + 1];
 
 		static GF() {
 			AlphaTable[1] = 1;
@@ -95,12 +95,15 @@ namespace QRCodeArt {
 		}
 
 		public override string ToString() {
+			bool first = true;
 			var sb = new StringBuilder(32);
 			sb.Append("a^").Append(Exponent).Append(" = ");
 			for (int i = 7; i >= 0; i--) {
 				if ((Polynom & (1 << i)) != 0) {
-					if (sb.Length > 0) {
+					if (!first) {
 						sb.Append('+');
+					} else {
+						first = false;
 					}
 					sb.Append("a^").Append(i);
 				}
