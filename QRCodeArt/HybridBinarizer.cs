@@ -20,10 +20,10 @@ namespace QRCodeArt {
 			int height = bitmap.Height;
 			var bitmapData = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
 			var bgr = (uint*) bitmapData.Scan0;
-
 			int subWidth = (width + (BlockSize - 1)) / BlockSize;
 			int subHeight = (height + (BlockSize - 1)) / BlockSize;
 			byte[,] grayPoints = new byte[subWidth, subHeight];
+
 			for (int y = 0; y < subHeight; y++) {
 				int yOffset = Math.Min(y * BlockSize, height - BlockSize);
 				for (int x = 0; x < subWidth; x++) {

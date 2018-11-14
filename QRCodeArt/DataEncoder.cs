@@ -40,7 +40,7 @@ namespace QRCodeArt {
 			int validBits = GetDataBitCount(length);
 
 			var bitResult = new BitSet(needBits);
-			bitResult.Write(0, (int) DataMode, 4);
+			bitResult.Write(0, (int)DataMode, 4);
 			bitResult.Write(4, length, BitsOfDataLength);
 			bitResult.Write(4 + BitsOfDataLength, binary, 0, binary.Count);
 
@@ -58,33 +58,23 @@ namespace QRCodeArt {
 			return bitResult;
 		}
 
-		/// <summary>
-		/// 计算纠错码。r(x) = f(x) * x^n (mod gp(x))
-		/// <para>r(x) = (ecc[0]*x^(n-1)+ecc[1]*x^(n-2)+...+ecc[n-1]*x^0)</para>
-		/// <para>f(x) = (msg[0]*x^(m-1)+msg[1]*x^(m-2)+...+msg[m-1]*x^0)</para>
-		/// <para>gp(x) = (x+a^0)(x+a^1)...(x+a^(n-1))</para>
-		/// <para>m为消息长度，n为纠错码长度。</para>
-		/// </summary>
-		/// <param name="array"></param>
-		/// <returns></returns>
-		public static byte[] CalculateECCWords(ArraySegment<byte> array, int eccBytes) {
-			return GF.XPolynom.RSEncode(array.Array, array.Offset, array.Count, eccBytes);
-		}
-
 		public (byte[] Data, byte[] Ecc)[] Encode(byte[] data, int start, int length, bool fillPadding = true, bool withEcc = true) {
 			var encodedData = DataEncode(data, start, length, fillPadding);
-			var wordsList = new List<(byte[] Data, byte[] Ecc)>();
-			for (int i = 0; i < ECCInfo.BlocksInGroup1; i++) {
-				var subData = new ArraySegment<byte>(encodedData.ByteArray, i * ECCInfo.CodewordsInGroup1, ECCInfo.CodewordsInGroup1);
-				var eccWords = withEcc ? CalculateECCWords(subData, ECCInfo.ECCPerBytes) : null;
-				wordsList.Add((subData.ToArray(), eccWords));
+			int totalBlockCount = ECCInfo.BlocksInGroup1 + ECCInfo.BlocksInGroup2;
+			var wordsArray = new (byte[] Data, byte[] Ecc)[totalBlockCount];
+			int i = 0;
+			int offset = 0;
+			for (; i < ECCInfo.BlocksInGroup1; i++, offset += ECCInfo.CodewordsInGroup1) {
+				var subData = encodedData.ByteArray.AsSpan(offset, ECCInfo.CodewordsInGroup1);
+				var eccWords = withEcc ? RS.Encode(subData, ECCInfo.ECCPerBytes) : null;
+				wordsArray[i] = (subData.ToArray(), eccWords);
 			}
-			for (int i = 0; i < ECCInfo.BlocksInGroup2; i++) {
-				var subData = new ArraySegment<byte>(encodedData.ByteArray, i * ECCInfo.CodewordsInGroup2, ECCInfo.CodewordsInGroup2);
-				var eccWords = withEcc ? CalculateECCWords(subData, ECCInfo.ECCPerBytes) : null;
-				wordsList.Add((subData.ToArray(), eccWords));
+			for (; i < totalBlockCount; i++, offset += ECCInfo.CodewordsInGroup2) {
+				var subData = encodedData.ByteArray.AsSpan(offset, ECCInfo.CodewordsInGroup2);
+				var eccWords = withEcc ? RS.Encode(subData, ECCInfo.ECCPerBytes) : null;
+				wordsArray[i] = (subData.ToArray(), eccWords);
 			}
-			return wordsList.ToArray();
+			return wordsArray;
 		}
 
 		public static DataMode GuessMode(byte[] data) {

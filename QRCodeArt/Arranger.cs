@@ -26,7 +26,7 @@ namespace QRCodeArt {
 		}
 
 		public static (bool[] Data, bool[] Ecc)[] ToBitBlocks(IReadOnlyList<(byte[] Data, byte[] Ecc)> input) {
-			var result = new(bool[] Data, bool[] Ecc)[input.Count];
+			var result = new (bool[] Data, bool[] Ecc)[input.Count];
 			for (int i = 0; i < result.Length; i++) {
 				result[i] = (ToBitArray(input[i].Data), ToBitArray(input[i].Ecc));
 			}
@@ -38,7 +38,7 @@ namespace QRCodeArt {
 		}
 
 		public static (byte[] Data, byte[] Ecc)[] ToByteBlocks(IReadOnlyList<(bool[] Data, bool[] Ecc)> input) {
-			var result = new(byte[] Data, byte[] Ecc)[input.Count];
+			var result = new (byte[] Data, byte[] Ecc)[input.Count];
 			for (int i = 0; i < result.Length; i++) {
 				result[i] = (ToByteArray(input[i].Data), ToByteArray(input[i].Ecc));
 			}
@@ -48,7 +48,7 @@ namespace QRCodeArt {
 		public static (T[] Data, T[] Ecc)[] GetBlocks<T>(int blocks1, int words1, int blocks2, int words2, int eccNum, int step, IEnumerable<T> dataIterator = null, bool withEcc = true) {
 			var sumBlocks = blocks1 + blocks2;
 			var maxWords = Math.Max(words1, words2);
-			var result = new(T[] Data, T[] Ecc)[sumBlocks];
+			var result = new (T[] Data, T[] Ecc)[sumBlocks];
 			for (int i = 0; i < blocks1; i++)
 				result[i] = (new T[words1], withEcc ? new T[eccNum] : null);
 			for (int i = blocks1; i < sumBlocks; i++)
@@ -60,7 +60,7 @@ namespace QRCodeArt {
 						for (int i = 0; i < sumBlocks; i++) {
 							if (j >= result[i].Data.Length) continue;
 							for (int k = 0; k < step; k++) {
-								enumer.MoveNext();
+								if (!enumer.MoveNext()) return result;
 								result[i].Data[j + k] = enumer.Current;
 							}
 						}
@@ -69,7 +69,7 @@ namespace QRCodeArt {
 						for (int j = 0; j < eccNum; j += step) {
 							for (int i = 0; i < sumBlocks; i++) {
 								for (int k = 0; k < step; k++) {
-									enumer.MoveNext();
+									if (!enumer.MoveNext()) return result;
 									result[i].Ecc[j + k] = enumer.Current;
 								}
 							}

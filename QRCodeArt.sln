@@ -15,6 +15,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QRCodeArt.HybridBinarizer",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QRCodeArt.Editor", "QRCodeArt.Editor\QRCodeArt.Editor.csproj", "{B2E9B351-3926-4213-BCF4-D63BA7E5686E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "ConsoleApp1\ConsoleApp1.csproj", "{14B851F0-892F-451A-BE5C-B34BEDC09E98}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QRCodeArt.头像", "QRCodeArt.头像\QRCodeArt.头像.csproj", "{1A8890DA-B45B-4699-878B-8193FE913A0D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +49,14 @@ Global
 		{B2E9B351-3926-4213-BCF4-D63BA7E5686E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2E9B351-3926-4213-BCF4-D63BA7E5686E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B2E9B351-3926-4213-BCF4-D63BA7E5686E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{14B851F0-892F-451A-BE5C-B34BEDC09E98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{14B851F0-892F-451A-BE5C-B34BEDC09E98}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{14B851F0-892F-451A-BE5C-B34BEDC09E98}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{14B851F0-892F-451A-BE5C-B34BEDC09E98}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A8890DA-B45B-4699-878B-8193FE913A0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A8890DA-B45B-4699-878B-8193FE913A0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A8890DA-B45B-4699-878B-8193FE913A0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A8890DA-B45B-4699-878B-8193FE913A0D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

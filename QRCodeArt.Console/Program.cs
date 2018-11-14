@@ -142,7 +142,7 @@ namespace QRCodeArt.Console {
 			//}
 			//System.Console.WriteLine();
 
-			int version = 20;
+			int version = 5;
 			byte[] data1 = Encoding.UTF8.GetBytes("0.0");
 			var N = QRInfo.GetN(version);
 			int padding = 6;
@@ -163,37 +163,82 @@ namespace QRCodeArt.Console {
 					//	pixels[x, y] = ImagePixel.Any;
 					//}
 
-					if (y >= padding && y < N - padding && x >= padding && x < N - padding) {
-						pixels[x, y] = y % 2 == 0 ? ImagePixel.White : ImagePixel.Black;
-					} else {
-						pixels[x, y] = ImagePixel.Any | ImagePixel.White;
-					}
+					//if (y >= padding && y < N - padding && x >= padding && x < N - padding) {
+					//	pixels[x, y] = y % 2 == 0 ? ImagePixel.White : ImagePixel.Black;
+					//} else {
+					//	pixels[x, y] = ImagePixel.Any | ImagePixel.White;
+					//}
 				}
 			}
-			//pixels[0, 9] = ImagePixel.Black;
-			//pixels[0, 10] = ImagePixel.Black;
-			//pixels[0, 11] = ImagePixel.Black;
-			//pixels[0, 12] = ImagePixel.Black;
-			//pixels[1, 9] = ImagePixel.Black;
-			//pixels[1, 10] = ImagePixel.Black;
-			//pixels[1, 11] = ImagePixel.Black;
-			//pixels[1, 12] = ImagePixel.Black;
-			//pixels[9, 0] = ImagePixel.Any;
-			//pixels[10, 0] = ImagePixel.Any;
-			//pixels[11, 0] = ImagePixel.Any;
-			//pixels[12, 0] = ImagePixel.Any;
-			////pixels[9, 1 ]= ImagePixel.Any;
-			//pixels[10, 1] = ImagePixel.Any;
-			//pixels[11, 1] = ImagePixel.Any;
-			//pixels[12, 1] = ImagePixel.Any;
+			pixels[0, 9] = ImagePixel.Black;
+			pixels[0, 10] = ImagePixel.Black;
+			pixels[0, 11] = ImagePixel.Black;
+			pixels[0, 12] = ImagePixel.Black;
+			pixels[0, 13] = ImagePixel.Black;
+			pixels[0, 14] = ImagePixel.Black;
+			pixels[0, 15] = ImagePixel.Black;
+			pixels[0, 16] = ImagePixel.Black;
+			pixels[1, 9] = ImagePixel.Black;
+			pixels[1, 10] = ImagePixel.Black;
+			pixels[1, 11] = ImagePixel.Black;
+			pixels[1, 12] = ImagePixel.Black;
+			pixels[1, 13] = ImagePixel.Black;
+			pixels[1, 14] = ImagePixel.Black;
+			pixels[1, 15] = ImagePixel.Black;
+			pixels[1, 16] = ImagePixel.Black;
+			pixels[2, 9] = ImagePixel.Black;
+			pixels[2, 10] = ImagePixel.Black;
+			pixels[2, 11] = ImagePixel.Black;
+			pixels[2, 12] = ImagePixel.Black;
+			pixels[2, 13] = ImagePixel.Black;
+			pixels[2, 14] = ImagePixel.Black;
+			pixels[2, 15] = ImagePixel.Black;
+			pixels[2, 16] = ImagePixel.Black;
+			pixels[3, 9] = ImagePixel.Black;
+			pixels[3, 10] = ImagePixel.Black;
+			pixels[3, 11] = ImagePixel.Black;
+			pixels[3, 12] = ImagePixel.Black;
+			pixels[3, 13] = ImagePixel.Black;
+			pixels[3, 14] = ImagePixel.Black;
+			pixels[3, 15] = ImagePixel.Black;
+			pixels[3, 16] = ImagePixel.Black;
+
+			pixels[9, 0] = ImagePixel.Any;
+			pixels[10, 0] = ImagePixel.Any;
+			pixels[11, 0] = ImagePixel.Any;
+			pixels[12, 0] = ImagePixel.Any;
+			pixels[9, 1 ]= ImagePixel.Any;
+			pixels[10, 1] = ImagePixel.Any;
+			pixels[11, 1] = ImagePixel.Any;
+			pixels[12, 1] = ImagePixel.Any;
+			pixels[9, 2] = ImagePixel.Any;
+			pixels[10, 2] = ImagePixel.Any;
+			pixels[11, 2] = ImagePixel.Any;
+			pixels[12, 2] = ImagePixel.Any;
+			pixels[9, 3] = ImagePixel.Any;
+			pixels[10, 3] = ImagePixel.Any;
+			pixels[11, 3] = ImagePixel.Any;
+			pixels[12, 3] = ImagePixel.Any;
+			pixels[13, 3] = ImagePixel.Any;
+			pixels[14, 3] = ImagePixel.Any;
+			pixels[15, 3] = ImagePixel.Any;
+			//pixels[16, 3] = ImagePixel.Any;
+			//pixels[17, 3] = ImagePixel.Any;
+			//pixels[18, 3] = ImagePixel.Any;
+			//pixels[19, 3] = ImagePixel.Any;
+			//pixels[20, 3] = ImagePixel.Any;
+			//pixels[21, 3] = ImagePixel.Any;
 
 			int cellSize = 5;
-			pixels = QRCodeMagician.GetImagePixel(version, new Bitmap(@"Z:\1.png"), cellSize);
-			var qr = QRCodeMagician.ImageArt(DataMode.Byte, version, ECCLevel.L, MaskVersion.Version100, data1, pixels, QRInfo.GetMaxErrorAllowBytes(version, ECCLevel.L) / 2);
-			Save(@"Z:\art.png", qr, null, cellSize);
+			//pixels = QRCodeMagician.GetImagePixel(version, new Bitmap(@"Z:\1.png"), cellSize);
+			//var qr = QRCodeMagician.ImageArt(DataMode.Byte, version, ECCLevel.L, MaskVersion.Version100, data1, pixels, QRInfo.GetMaxErrorAllowBytes(version, ECCLevel.L) / 2);
+			//Save(@"Z:\art.png", qr, null, cellSize);
 
 			var qr2 = QRCodeMagician.ImageArt(DataMode.Byte, version, ECCLevel.L, MaskVersion.Version100, data1, pixels);
-			Save(@"Z:\art2.png", qr2, null, cellSize);
+			Save(@"D:\MyDocuments\Desktop\art2.png", qr2, null, cellSize);
+
+			//var qr = new QRCode(version, DataMode.Byte, data1, ECCLevel.Q);
+			//Save(@"D:\MyDocuments\Desktop\art2.png", qr, null, cellSize);
 
 			//var bits = new BitSet(1000);
 			//bits[3] = true;

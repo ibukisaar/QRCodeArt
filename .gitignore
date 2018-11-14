@@ -260,3 +260,5 @@ paket-files/
 __pycache__/
 *.pyc
 /QRCodeArt.Editor
+/ConsoleApp1
+/QRCodeArt.头像

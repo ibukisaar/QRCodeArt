@@ -1,24 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace QRCodeArt {
-	public static class QRCodeMagician {
-		public enum BitType {
+	unsafe public static class QRCodeMagician {
+		public enum BitType : byte {
 			/// <summary>
 			/// 固定值。 Data：无法被修改了。ECC：未使用。
 			/// </summary>
 			Fixed,
 			/// <summary>
-			/// 自由值。 Data：待求解。ECC：可以随意赋值。
+			/// 自由值。 Data：可以随意赋值（待求解）。ECC：无视，不关心是0还是1。
 			/// </summary>
 			Freedom,
 			/// <summary>
-			/// 期望值。 Data：直接设置成Template值。ECC：通过求解Data达到期望值。
+			/// 期望值。 Data：直接设置成Template值。ECC：通过求解Freedom的Data达到期望值。
 			/// </summary>
 			Expect
 		}
@@ -37,7 +39,7 @@ namespace QRCodeArt {
 		/// <returns></returns>
 		public static (QRCode QRCode1, QRCode QRCode2, bool Swap) CreateObfuscatedQRCode(byte[] data1, byte[] data2) {
 			for (int level = 0; level < 4; level++) {
-				var eccLevel = (ECCLevel) level;
+				var eccLevel = (ECCLevel)level;
 				var mode1 = DataEncoder.GuessMode(data1);
 				while (true) {
 					var mode2 = DataEncoder.GuessMode(data2);
@@ -47,9 +49,9 @@ namespace QRCodeArt {
 						var ver = Math.Max(ver1, ver2);
 						for (; ver <= 40; ver++) {
 							for (int mask1 = 0; mask1 < 8; mask1++) {
-								var qr1 = QRCode.AnalysisOverlay(ver, mode1, data1, eccLevel, (MaskVersion) mask1);
+								var qr1 = QRCode.AnalysisOverlay(ver, mode1, data1, eccLevel, (MaskVersion)mask1);
 								for (int mask2 = 0; mask2 < 8; mask2++) {
-									var qr2 = QRCode.AnalysisOverlay(ver, mode2, data2, eccLevel, (MaskVersion) mask2);
+									var qr2 = QRCode.AnalysisOverlay(ver, mode2, data2, eccLevel, (MaskVersion)mask2);
 									var foverlay = OverlayAnalyzer.IsOverlay(qr1.FormatBinary, qr2.FormatBinary);
 									if (foverlay) {
 										var overlay = OverlayAnalyzer.IsOverlay(qr1.AnalysisGroup, qr2.AnalysisGroup, qr1.MaxErrorAllowBytes + qr2.MaxErrorAllowBytes);
@@ -94,7 +96,7 @@ namespace QRCodeArt {
 		static readonly DataMode[] sortedModeTable = { DataMode.Numeric, DataMode.Alphanumeric, DataMode.Byte };
 
 		private static bool NextMode(DataMode mode, out DataMode result) {
-			var i = modeIndexes[(int) mode];
+			var i = modeIndexes[(int)mode];
 			if (i < 0 || i + 1 >= sortedModeTable.Length) {
 				result = 0;
 				return false;
@@ -143,7 +145,7 @@ namespace QRCodeArt {
 					flags[i] = BitType.Expect;
 				}
 			}
-			var templateArray = Array.ConvertAll(pixelArray, p => p.HasFlag(ImagePixel.Black)); // template = image
+			var templateArray = Array.ConvertAll(pixelArray, p => (p & ImagePixel.PixelMask) == ImagePixel.Black); // template = image
 			var flagBlocks = Arranger.GetBitBlocks(version, level, flags);
 			var templateBlocks = Arranger.GetBitBlocks(version, level, templateArray);
 			var dataBlocks = Arranger.GetBitBlocks<bool>(version, level, null, false);
@@ -160,22 +162,25 @@ namespace QRCodeArt {
 						dataBits[j] = templateBlocks[i].Data[j];
 					}
 				}
-				encodedBytes[i].Ecc = GF.XPolynom.RSEncode(encodedBytes[i].Data, 0, encodedBytes[i].Data.Length, qr.Encoder.ECCInfo.ECCPerBytes);
+				encodedBytes[i].Ecc = RS.Encode(encodedBytes[i].Data, qr.Encoder.ECCInfo.ECCPerBytes);
 			}
 			Xor(templateBlocks, encodedBytes);
 
-			var tempResult = new(byte[] Data, byte[] Ecc)[dataBlocks.Length];
+			var tempResult = new (byte[] Data, byte[] Ecc)[dataBlocks.Length];
 			for (int i = 0; i < dataBlocks.Length; i++) {
 				dataBlocks[i].Data = Arranger.ToBitArray(encodedBytes[i].Data);
 
 				// RS(padding) = RS(data) ^ image ^ mask
-				Match(templateBlocks[i], (dataBlocks[i].Data, qr.Encoder.ECCInfo.ECCPerBytes * 8), flagBlocks[i]);
+				var templateData = templateBlocks[i].Data.Zip(flagBlocks[i].Data, (val, flag) => new MagicBit(flag == BitType.Freedom ? MagicBitType.Freedom : MagicBitType.Expect, val)).ToArray();
+				var templateEcc = templateBlocks[i].Ecc.Zip(flagBlocks[i].Ecc, (val, flag) => new MagicBit(flag == BitType.Freedom ? MagicBitType.Freedom : MagicBitType.Expect, val)).ToArray();
+				Match(templateData, templateEcc, dataBlocks[i].Data);
 
 				// RS(data+padding) = RS(data) ^ RS(padding) = RS(data) ^ RS(data) ^ image ^ mask = image ^ mask
 				var dataBytes = Arranger.ToByteArray(dataBlocks[i].Data);
-				var ecc = GF.XPolynom.RSEncode(dataBytes, 0, dataBytes.Length, qr.Encoder.ECCInfo.ECCPerBytes);
+				var ecc = RS.Encode(dataBytes, qr.Encoder.ECCInfo.ECCPerBytes);
 				tempResult[i] = (dataBytes, ecc);
 
+#if DEBUG
 				#region DEBUG
 				var bits = new BitSet(ecc);
 				var cmpBits = new BitSet(encodedBytes[i].Ecc);
@@ -192,6 +197,7 @@ namespace QRCodeArt {
 				// Console.WriteLine();
 				Console.WriteLine($"总数：{total}, 命中：{correct}");
 				#endregion
+#endif
 			}
 
 			// output.ecc = RS(padding) ^ mask = image ^ mask ^ mask = image
@@ -212,11 +218,11 @@ namespace QRCodeArt {
 				for (int i = 0; i < tempResult.Length; i++) {
 					int dataLength = tempResult[i].Data.Length;
 					int eccLength = tempResult[i].Ecc.Length;
-					var errorTable = new(int Index, bool Unstable, int Score)[dataLength + eccLength];
+					var errorTable = new (int Index, bool Unstable, int Score)[dataLength + eccLength];
 					for (int j = 0; j < errorTable.Length; j++) errorTable[j].Index = j;
 
 					for (int j = 0; j < dataLength; j++) {
-						byte diff = (byte) (tempResult[i].Data[j] ^ imageBlocks[i].Data[j]);
+						byte diff = (byte)(tempResult[i].Data[j] ^ imageBlocks[i].Data[j]);
 						errorTable[j].Score = NormalWeight * BitCount(diff);
 						var unstableCount = BitCount(unstableFlagsBlocks[i].Data[j]);
 						if (unstableCount == 0) {
@@ -228,7 +234,7 @@ namespace QRCodeArt {
 						}
 					}
 					for (int j = 0; j < eccLength; j++) {
-						byte diff = (byte) (tempResult[i].Ecc[j] ^ imageBlocks[i].Ecc[j]);
+						byte diff = (byte)(tempResult[i].Ecc[j] ^ imageBlocks[i].Ecc[j]);
 						errorTable[dataLength + j].Score = BitCount(diff);
 						var unstableCount = NormalWeight * BitCount(unstableFlagsBlocks[i].Ecc[j]);
 						if (unstableCount == 0) {
@@ -312,9 +318,10 @@ namespace QRCodeArt {
 				var rBits = new BitSet(GF.XPolynom.RSEncode(msgExpectBits.ByteArray, 0, msgExpectBits.ByteArray.Length, dst.EccBits / 8));
 				msgExpectBits[unknowns[i]] = false;
 
+
 				leftBits[i][i] = 1;
 				for (int j = 0; j < expects.Count; j++) {
-					rightBits[i][j] = rBits[expects[j]] ? (byte) 1 : (byte) 0;
+					rightBits[i][j] = rBits[expects[j]] ? (byte)1 : (byte)0;
 				}
 			}
 
@@ -332,7 +339,373 @@ namespace QRCodeArt {
 			}
 		}
 
-		private static void DebugPrint(byte[][] left, byte[][] right) {
+		static readonly byte[] Log2Table = {
+			0,1,10,2,11,14,24,3,30,12,28,15,21,25,17,4,31,9,13,23,29,27,20,16,8,22,26,19,7,18,6,5
+		};
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		static int IntLog2(int x) => Log2Table[((uint)x * 0x7C4BB35u) >> 27];
+
+		static byte[] Graycode(int bits) {
+			if (bits < 0) throw new ArgumentException($"{nameof(bits)}必须>=0");
+			var result = new byte[1 << bits];
+			for (int n = 1; n <= bits; n++) {
+				int offset = 1 << (n - 1);
+				result[offset] = (byte)(n - 1);
+				for (int i = 1; i < offset; i++) {
+					result[offset + i] = result[offset - i];
+				}
+			}
+			return result;
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		static int BitCount(ulong x) {
+			x = x - ((x >> 1) & 0x5555555555555555u);
+			x = (x & 0x3333333333333333u) + ((x >> 2) & 0x3333333333333333u);
+			x = x + (x >> 4) & 0x0f0f0f0f0f0f0f0fu;
+			return (int)(x % 255);
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		static void SetBit(byte* bits, int index, bool value) {
+			if (value) {
+				bits[index >> 3] |= (byte)(1 << (7 - (index & 7)));
+			} else {
+				bits[index >> 3] &= (byte)~(1 << (7 - (index & 7)));
+			}
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		static bool GetBit(ReadOnlySpan<byte> bits, int index) {
+			return (bits[index >> 3] & (1 << (7 - (index & 7)))) != 0;
+		}
+
+		static int Match1(byte[] graycode, ulong** eccTable, ulong* target) {
+			int ans = 0;
+			int minError = BitCount(target[0]);
+			int currGraycode = 0;
+			for (int i = 1; i < graycode.Length; i++) {
+				if (minError == 0) return ans;
+				currGraycode ^= 1 << graycode[i];
+				var vector = eccTable[graycode[i]];
+				target[0] ^= vector[0];
+				int error = BitCount(target[0]);
+				if (error < minError) {
+					minError = error;
+					ans = currGraycode;
+				}
+			}
+			return ans;
+		}
+
+		static int Match2(byte[] graycode, ulong** eccTable, ulong* target) {
+			int ans = 0;
+			int minError = BitCount(target[0]) + BitCount(target[1]);
+			int currGraycode = 0;
+			for (int i = 1; i < graycode.Length; i++) {
+				if (minError == 0) return ans;
+				currGraycode ^= 1 << graycode[i];
+				var vector = eccTable[graycode[i]];
+				target[0] ^= vector[0];
+				target[1] ^= vector[1];
+				int error = BitCount(target[0]) + BitCount(target[1]);
+				if (error < minError) {
+					minError = error;
+					ans = currGraycode;
+				}
+			}
+			return ans;
+		}
+
+		static int Match3(byte[] graycode, ulong** eccTable, ulong* target) {
+			int ans = 0;
+			int minError = BitCount(target[0]) + BitCount(target[1]) + BitCount(target[2]);
+			int currGraycode = 0;
+			for (int i = 1; i < graycode.Length; i++) {
+				if (minError == 0) return ans;
+				currGraycode ^= 1 << graycode[i];
+				var vector = eccTable[graycode[i]];
+				target[0] ^= vector[0];
+				target[1] ^= vector[1];
+				target[2] ^= vector[2];
+				int error = BitCount(target[0]) + BitCount(target[1]) + BitCount(target[2]);
+				if (error < minError) {
+					minError = error;
+					ans = currGraycode;
+				}
+			}
+			return ans;
+		}
+
+		static int Match4(byte[] graycode, ulong** eccTable, ulong* target) {
+			int ans = 0;
+			int minError = BitCount(target[0]) + BitCount(target[1]) + BitCount(target[2]) + BitCount(target[3]);
+			int currGraycode = 0;
+			for (int i = 1; i < graycode.Length; i++) {
+				if (minError == 0) return ans;
+				currGraycode ^= 1 << graycode[i];
+				var vector = eccTable[graycode[i]];
+				target[0] ^= vector[0];
+				target[1] ^= vector[1];
+				target[2] ^= vector[2];
+				target[3] ^= vector[3];
+				int error = BitCount(target[0]) + BitCount(target[1]) + BitCount(target[2]) + BitCount(target[3]);
+				if (error < minError) {
+					minError = error;
+					ans = currGraycode;
+				}
+			}
+			return ans;
+		}
+
+		static int Match(ReadOnlySpan<IntPtr> eccTable, IntPtr target, int longCount) {
+			var graycode = Graycode(eccTable.Length); // 用格雷码加速遍历过程
+			fixed (IntPtr* pTable = eccTable) {
+				switch (longCount) {
+					case 1: return Match1(graycode, (ulong**)pTable, (ulong*)target);
+					case 2: return Match2(graycode, (ulong**)pTable, (ulong*)target);
+					case 3: return Match3(graycode, (ulong**)pTable, (ulong*)target);
+					case 4: return Match4(graycode, (ulong**)pTable, (ulong*)target);
+				}
+			}
+			throw new NotSupportedException();
+		}
+
+		/// <summary>
+		/// 尽量让<paramref name="outData"/>的RS编码结果匹配<paramref name="templateEcc"/>
+		/// </summary>
+		/// <param name="templateData"></param>
+		/// <param name="templateEcc"></param>
+		/// <param name="outData"></param>
+		public static void Match(ReadOnlySpan<MagicBit> templateData, ReadOnlySpan<MagicBit> templateEcc, Span<bool> outData) {
+			if (templateData.Length != outData.Length) throw new ArgumentException($"{nameof(templateData)}和{nameof(outData)}长度不一致");
+			if (templateData.Length % 8 != 0) throw new ArgumentException($"{nameof(templateData)}的长度必须是8的倍数");
+			if (templateEcc.Length % 8 != 0) throw new ArgumentException($"{nameof(templateEcc)}的长度必须是8的倍数");
+			int dataLength = templateData.Length / 8;
+			int eccLength = templateEcc.Length / 8;
+
+			var unknowns = new List<int>(); // 未知数列表
+			for (int i = 0; i < templateData.Length; i++) {
+				if (templateData[i].Type == MagicBitType.Freedom) {
+					unknowns.Add(i);
+				}
+			}
+			if (unknowns.Count == 0) return;
+
+			var expects = new List<int>(); // 期望值列表
+			for (int i = 0; i < templateEcc.Length; i++) {
+				if (templateEcc[i].Type == MagicBitType.Expect) {
+					expects.Add(i);
+				}
+			}
+			if (expects.Count == 0) {
+				for (int i = 0; i < unknowns.Count; i++) {
+					outData[unknowns[i]] = templateData[unknowns[i]].Value;
+				}
+				return;
+			}
+			// unknowns和expects将组成方程组
+
+			Span<byte> tempEcc = stackalloc byte[eccLength];
+			var gaussianElimination = new GaussianEliminationTarget(Math.Min(unknowns.Count, expects.Count));
+			var actualUnknowns = new List<int>();
+			var overflow = new List<int>();
+
+			RandomOrder(unknowns);
+			for (int i = 0; i < unknowns.Count; i++) {
+				RS.Encode((byte)(1 << (7 - (unknowns[i] & 7))), dataLength - 1 - (unknowns[i] >> 3), tempEcc);
+				var eccVector = new byte[expects.Count];
+				for (int j = 0; j < expects.Count; j++) {
+					eccVector[j] = (tempEcc[expects[j] >> 3] & (1 << (7 - (expects[j] & 7)))) != 0 ? (byte)1 : (byte)0;
+				}
+
+				bool success = gaussianElimination.AddVectorDamage(eccVector);
+				if (success) {
+					actualUnknowns.Add(unknowns[i]);
+				} else {
+					overflow.Add(unknowns[i]);
+				}
+			}
+
+			byte[] targetEcc = new byte[expects.Count];
+			for (int i = 0; i < targetEcc.Length; i++) {
+				targetEcc[i] = templateEcc[expects[i]].Value ? (byte)1 : (byte)0;
+			}
+
+			if (overflow.Count > 0) {
+				var overflowData = new BitSet(new byte[dataLength]);
+				foreach (var i in overflow) { // 溢出的未知数不需要参与运算，直接设置成templateData
+					overflowData[i] = outData[i] = templateData[i].Value;
+				}
+				RS.Encode(overflowData.ByteArray, tempEcc);
+				for (int i = 0; i < expects.Count; i++) {
+					if (GetBit(tempEcc, expects[i])) {
+						targetEcc[i] ^= 1;
+					}
+				}
+			}
+
+#if DEBUG
+			#region DEBUG
+			Console.WriteLine($"自由：{unknowns.Count}, 实际自由：{actualUnknowns.Count}, 溢出自由：{overflow.Count}, 期望：{expects.Count}");
+			#endregion
+#endif
+
+			if (actualUnknowns.Count <= 24 && expects.Count >= 28) { // 如果未知数太少了，可以采用暴力搜索求解方程组
+				int expectsLongCount = (expects.Count + 63) / 64;
+				var eccVectorBuffer = stackalloc ulong[actualUnknowns.Count * expectsLongCount];
+				var targetEccBuffer = stackalloc ulong[expectsLongCount];
+				Span<IntPtr> eccTable = stackalloc IntPtr[actualUnknowns.Count];
+				for (int i = 0; i < actualUnknowns.Count; i++) {
+					RS.Encode((byte)(1 << (7 - (actualUnknowns[i] & 7))), dataLength - 1 - (actualUnknowns[i] >> 3), tempEcc);
+					var eccVector = (byte*)(eccVectorBuffer + i * expectsLongCount);
+					for (int j = 0; j < expects.Count; j++) {
+						SetBit(eccVector, j, (tempEcc[expects[j] >> 3] & (1 << (7 - (expects[j] & 7)))) != 0);
+					}
+					eccTable[i] = (IntPtr)eccVector;
+				}
+
+				for (int j = 0; j < expects.Count; j++) {
+					SetBit((byte*)targetEccBuffer, j, targetEcc[j] != 0);
+				}
+
+				int ans = Match(eccTable, (IntPtr)targetEccBuffer, expectsLongCount);
+				for (int i = 0; i < actualUnknowns.Count; i++) {
+					outData[actualUnknowns[i]] = (ans & (1 << i)) != 0;
+				}
+
+			} else { // 解方程
+				var left = new byte[actualUnknowns.Count];
+				var linearlyIndependent = gaussianElimination.LinearlyIndependent;
+				for (int i = 0; i < linearlyIndependent.Count; i++) {
+					if (targetEcc[linearlyIndependent[i]] != 0) {
+						for (int j = 0; j < left.Length; j++) {
+							left[j] ^= gaussianElimination.Left[i][j];
+						}
+					}
+				}
+
+				var tempData = new BitSet(new byte[dataLength]);
+				for (int i = 0; i < left.Length; i++) {
+					tempData[actualUnknowns[i]] = left[i] != 0;
+				}
+				RS.Encode(tempData.ByteArray, tempEcc);
+				int error = 0;
+				for (int i = 0; i < targetEcc.Length; i++) {
+					if ((targetEcc[i] != 0) != GetBit(tempEcc, expects[i])) {
+						error++;
+					}
+				}
+
+				if (error >= 2) { // 局部暴力搜索，尝试降低错误，提高匹配率
+					var loopLevel = Math.Min((int)Math.Log(1000_0000, actualUnknowns.Count), error - 1); // 大约尝试1千万次
+					var indexes = stackalloc int[loopLevel];
+					int expectsLongCount = (expects.Count + 63) / 64;
+					var eccVectorBuffer = stackalloc ulong[actualUnknowns.Count * expectsLongCount];
+					var targetEccBuffer = stackalloc ulong[expectsLongCount];
+					var targetBuffer = stackalloc ulong[expectsLongCount];
+					Span<IntPtr> eccTable = stackalloc IntPtr[actualUnknowns.Count];
+
+					for (int j = 0; j < expects.Count; j++) {
+						SetBit((byte*)targetBuffer, j, GetBit(tempEcc, expects[j]));
+					}
+
+					for (int i = 0; i < actualUnknowns.Count; i++) {
+						RS.Encode((byte)(1 << (7 - (actualUnknowns[i] & 7))), dataLength - 1 - (actualUnknowns[i] >> 3), tempEcc);
+						var eccVector = (byte*)(eccVectorBuffer + i * expectsLongCount);
+						for (int j = 0; j < expects.Count; j++) {
+							SetBit(eccVector, j, (tempEcc[expects[j] >> 3] & (1 << (7 - (expects[j] & 7)))) != 0);
+						}
+						eccTable[i] = (IntPtr)eccVector;
+					}
+
+					for (int j = 0; j < expects.Count; j++) {
+						SetBit((byte*)targetEccBuffer, j, targetEcc[j] != 0);
+					}
+					for (int i = 0; i < expectsLongCount; i++) {
+						targetBuffer[i] ^= targetEccBuffer[i];
+					}
+
+					int maxIndex = actualUnknowns.Count;
+					int currLoopLevel = 1;
+					int minError = error;
+					int[] minXor = Array.Empty<int>();
+					var tempTarget = stackalloc ulong[expectsLongCount];
+					int error0 = error;
+
+					while (minError > currLoopLevel) {
+						Restart:
+						indexes[0]++;
+						int i = 0;
+						for (; i < currLoopLevel - 1; i++) {
+							if (indexes[i] >= maxIndex) {
+								indexes[i] = 0;
+								indexes[i + 1]++;
+							}
+						}
+						if (indexes[i] >= maxIndex) {
+							indexes[i] = 0;
+							indexes[i + 1]++;
+							currLoopLevel++;
+							if (currLoopLevel > loopLevel) break;
+						}
+
+						for (i = 0; i < currLoopLevel; i++) {
+							for (int j = i + 1; j < currLoopLevel; j++) {
+								if (indexes[i] == indexes[j]) goto Restart;
+							}
+						}
+
+						for (i = 0; i < expectsLongCount; i++) {
+							tempTarget[i] = targetBuffer[i];
+						}
+						for (i = 0; i < currLoopLevel; i++) {
+							var xorVector = (ulong*)eccTable[indexes[i]];
+							for (int j = 0; j < expectsLongCount; j++) {
+								tempTarget[j] ^= xorVector[j];
+							}
+						}
+						error = 0;
+						for (i = 0; i < expectsLongCount; i++) {
+							error += BitCount(tempTarget[i]);
+						}
+
+						if (error < minError) {
+							minError = error;
+							minXor = new ReadOnlySpan<int>(indexes, currLoopLevel).ToArray();
+						}
+					}
+
+					foreach (var xorIndex in minXor) {
+						left[xorIndex] ^= 1;
+					}
+
+#if DEBUG
+					#region DEBUG
+					Console.WriteLine($"调整比特数：{minXor.Length}, 原错误：{error0}, 调整后错误：{minError}");
+					#endregion
+#endif
+				}
+
+				for (int i = 0; i < left.Length; i++) {
+					outData[actualUnknowns[i]] = left[i] != 0;
+				}
+			}
+		}
+
+		static readonly Random random = new Random();
+
+		static void RandomOrder<T>(IList<T> list) {
+			for (int i = 0; i < list.Count; i++) {
+				int j = random.Next(i, list.Count);
+				var temp = list[i];
+				list[i] = list[j];
+				list[j] = temp;
+			}
+		}
+
+		public static void DebugPrint(byte[][] left, byte[][] right) {
 			for (int i = 0; i < left.Length; i++) {
 				for (int j = 0; j < left[0].Length; j++) {
 					Console.Write((left[i][j] == 1 ? "1" : "."));
@@ -368,7 +741,7 @@ namespace QRCodeArt {
 		/// <param name="left">既是输入也是输出</param>
 		/// <param name="right"></param>
 		/// <returns></returns>
-		private static List<int> GaussianElimination(byte[][] left, byte[][] right) {
+		public static List<int> GaussianElimination(byte[][] left, byte[][] right) {
 			void Swap(ref byte[] x, ref byte[] y) {
 				var t = x; x = y; y = t;
 			}
@@ -428,11 +801,19 @@ namespace QRCodeArt {
 				}
 				right = newRight;
 			}
+			//DebugPrint(left, right);
+			//Console.WriteLine();
 			ReverseMat(left);
 			ReverseMat(right);
+			//DebugPrint(left, right);
+			//Console.WriteLine();
 			Elimination();
+			//DebugPrint(left, right);
+			//Console.WriteLine();
 			ReverseMat(left);
 			ReverseMat(right);
+			//DebugPrint(left, right);
+			//Console.WriteLine();
 
 			int baseIndex = 0;
 			for (int i = 0; right[i][0] == 0; i++) baseIndex++;
@@ -445,6 +826,129 @@ namespace QRCodeArt {
 			return colIndexes;
 		}
 
+		unsafe public static (int[] LeftLinearlyIndependent, int[] RightLinearlyIndependent, int[][] EntangledIndexes, int[][] GroupIndexes) GaussianElimination(ref byte[][] left, ref byte[][] right) {
+			void Swap<T>(ref T x, ref T y) {
+				var t = x; x = y; y = t;
+			}
+
+			void Xor(byte[][] mat, int dstRow, int srcRow) {
+				var dst = mat[dstRow];
+				var src = mat[srcRow];
+				for (int i = 0; i < dst.Length; i++) {
+					dst[i] ^= src[i];
+				}
+			}
+
+			int* rowIndexes = stackalloc int[right.Length];
+			for (int i = 0; i < right.Length; i++) {
+				rowIndexes[i] = i;
+			}
+			List<int> colIndexes = new List<int>(right[0].Length);
+			int firstRow = 0, firstCol = 0;
+			for (; firstRow < right.Length && firstCol < right[0].Length; firstCol++) {
+				bool find = false;
+				for (int row = firstRow; row < right.Length; row++) {
+					if (right[row][firstCol] != 0) {
+						Swap(ref rowIndexes[firstRow], ref rowIndexes[row]);
+						Swap(ref left[firstRow], ref left[row]);
+						Swap(ref right[firstRow], ref right[row]);
+						colIndexes.Add(firstCol);
+						find = true;
+						break;
+					}
+				}
+				if (find) {
+					for (int row = firstRow + 1; row < right.Length; row++) {
+						if (right[row][firstCol] != 0) {
+							Xor(left, row, firstRow);
+							Xor(right, row, firstRow);
+						}
+					}
+					firstRow++;
+				}
+			}
+
+			int[] leftLinearlyIndependent = new int[firstRow];
+			for (int i = 0; i < leftLinearlyIndependent.Length; i++) {
+				leftLinearlyIndependent[i] = rowIndexes[i];
+			}
+			int[] rightLinearlyIndependent = colIndexes.ToArray();
+
+			Array.Resize(ref right, firstRow);
+			byte[][] newLeft = new byte[firstRow][];
+			for (int row = 0; row < firstRow; row++) {
+				newLeft[row] = new byte[firstRow];
+				for (int col = 0; col < firstRow; col++) {
+					newLeft[row][col] = left[row][leftLinearlyIndependent[col]];
+				}
+			}
+			left = newLeft;
+
+			for (int row = firstRow - 1; row >= 0; row--) {
+				int col = rightLinearlyIndependent[row];
+				for (int r = row - 1; r >= 0; r--) {
+					if (right[r][col] != 0) {
+						Xor(left, r, row);
+						Xor(right, r, row);
+					}
+				}
+			}
+
+			var indexLists = new List<int>[firstRow];
+			for (int i = 0; i < indexLists.Length; i++) {
+				indexLists[i] = new List<int>();
+			}
+
+			for (int i = 1; i < rightLinearlyIndependent.Length; i++) {
+				for (int col = rightLinearlyIndependent[i - 1] + 1; col < rightLinearlyIndependent[i]; col++) {
+					for (int row = 0; row < i; row++) {
+						if (right[row][col] != 0) {
+							indexLists[row].Add(col);
+						}
+					}
+				}
+			}
+			for (int col = rightLinearlyIndependent[firstRow - 1] + 1; col < right[0].Length; col++) {
+				for (int row = 0; row < right.Length; row++) {
+					if (right[row][col] != 0) {
+						indexLists[row].Add(col);
+					}
+				}
+			}
+
+			var entangledIndexes = Array.ConvertAll(indexLists, list => list.ToArray());
+
+			var indexesState = stackalloc bool[firstRow];
+			var rowQueue = new Queue<int>();
+			var groupIndexList = new List<int[]>();
+
+			for (int rootRow = 0; rootRow < firstRow; rootRow++) {
+				if (indexesState[rootRow]) continue;
+				indexesState[rootRow] = true;
+				var groupList = new List<int>();
+				rowQueue.Enqueue(rootRow);
+				while (rowQueue.Count > 0) {
+					var row0 = rowQueue.Dequeue();
+					foreach (var col in entangledIndexes[row0]) {
+						var maxRow = Math.Min(firstRow, col);
+						for (int row = 0; row < maxRow; row++) {
+							if (indexesState[row]) continue;
+							if (right[row][col] != 0) {
+								indexesState[row] = true;
+								rowQueue.Enqueue(row);
+							}
+						}
+					}
+					groupList.Add(row0);
+				}
+				groupIndexList.Add(groupList.ToArray());
+			}
+
+			var groupIndexes = groupIndexList.ToArray();
+
+			return (leftLinearlyIndependent, rightLinearlyIndependent, entangledIndexes, groupIndexes);
+		}
+
 		unsafe public static ImagePixel[,] GetImagePixel(int version, Bitmap bitmap, int cellSize, int halftoneSize = 0, int deviation = 16) {
 			const int RWeight = 19595;
 			const int GWeight = 38470;
@@ -454,7 +958,7 @@ namespace QRCodeArt {
 			bitmap = new Bitmap(bitmap, N * cellSize, N * cellSize);
 			var thresholds = HybridBinarizer.GetThreshold(bitmap);
 			var bitmapData = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-			var p = (uint*) bitmapData.Scan0;
+			var p = (uint*)bitmapData.Scan0;
 			var W = N * cellSize;
 			var result = new ImagePixel[N, N];
 			if (halftoneSize <= 0 || halftoneSize > cellSize) halftoneSize = cellSize;
@@ -464,6 +968,7 @@ namespace QRCodeArt {
 			for (int y = 0; y < N; y++) {
 				for (int x = 0; x < N; x++) {
 					bool whiteStable = true, blackStable = true;
+					int whiteStableMiss = 0, blackStableMiss = 0;
 					int graySum = 0;
 					int alpha = 0;
 					int thresholdSum = 0;
@@ -471,18 +976,31 @@ namespace QRCodeArt {
 					var py = y * cellSize;
 					for (int y0 = margin; y0 < margin + halftoneSize; y0++) {
 						for (int x0 = margin; x0 < margin + halftoneSize; x0++) {
-							var pix = (byte*) &p[(py + y0) * W + (px + x0)];
+							var pix = (byte*)&p[(py + y0) * W + (px + x0)];
 							int g = (pix[2] * RWeight + pix[1] * GWeight + pix[0] * BWeight) >> 16;
 							int t = thresholds[px + x0, py + y0];
-							// gray += (pix[2] + pix[1] + pix[0]) / 3;
+
 							graySum += g;
 							alpha += pix[3];
 							thresholdSum += t;
 
 							if (g < t + deviation) whiteStable = false;
 							if (g > t - deviation) blackStable = false;
+							//if (g < t + deviation) whiteStableMiss++;
+							//if (g > t - deviation) blackStableMiss++;
 						}
 					}
+
+					//if (whiteStableMiss >= baseCount / 2) whiteStable = false;
+					//if (blackStableMiss >= baseCount / 2) blackStable = false;
+
+					//int thresholdAvg = thresholdSum / (halftoneSize * halftoneSize);
+					//if (thresholdAvg < 100) result[x, y] = ImagePixel.Black;
+					//else if (thresholdAvg > 155) result[x, y] = ImagePixel.White;
+					//else result[x, y] = graySum > thresholdSum ? ImagePixel.White : ImagePixel.Black;
+					//if (graySum < thresholdSum + deviation * halftoneSize * halftoneSize) whiteStable = false;
+					//if (graySum > thresholdSum - deviation * halftoneSize * halftoneSize) blackStable = false;
+
 					result[x, y] = graySum > thresholdSum ? ImagePixel.White : ImagePixel.Black;
 					if (alpha < 128 * baseCount) result[x, y] = ImagePixel.Any | ImagePixel.White;
 					else if (whiteStable || blackStable) result[x, y] |= ImagePixel.Stable;
@@ -503,8 +1021,8 @@ namespace QRCodeArt {
 			var binarizer = HybridBinarizer.BinarizerBitmap(bitmap);
 			var data = bitmap.LockBits(new Rectangle(0, 0, W, W), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
 			var binarizerData = binarizer.LockBits(new Rectangle(0, 0, W, W), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
-			uint* alpha = (uint*) (data.Scan0 + 3);
-			uint* p = (uint*) binarizerData.Scan0;
+			uint* alpha = (uint*)data.Scan0;
+			uint* p = (uint*)binarizerData.Scan0;
 			var result = new ImagePixel[N, N];
 
 			for (int y = 0; y < N; y++) {
@@ -515,9 +1033,9 @@ namespace QRCodeArt {
 					var py = y * cellSize;
 					for (int y0 = margin; y0 < margin + halftoneSize; y0++) {
 						for (int x0 = margin; x0 < margin + halftoneSize; x0++) {
-							var pix = (byte*) &p[(py + y0) * W + (px + x0)];
+							var pix = (byte*)&p[(py + y0) * W + (px + x0)];
 							if (pix[0] <= 10) blackSum++;
-							alphaSum += *(byte*) &alpha[(py + y0) * W + (px + x0)];
+							alphaSum += ((byte*)&alpha[(py + y0) * W + (px + x0)])[3];
 						}
 					}
 

@@ -499,24 +499,24 @@ namespace QRCodeArt {
 			},
 		};
 
-		
-		static int GetIndex(ECCLevel level) => (int) level ^ 1;
 
-		public static int GetN(int version) => (version - 1) * 4 + 21;
+		static int GetIndex(ECCLevel level) => (int)level ^ 1;
+
+		public static int GetN(int version) => version * 4 + 17;
 
 		public static (int NumberOfDataBytes, int Numeric, int Alphanumeric, int Byte, int Kanji) GetDataCapacityInfo(int version, ECCLevel level) {
 			return DataCapacityTable[version - 1, GetIndex(level)];
 		}
-		
+
 		public static (int ECCPerBytes, int BlocksInGroup1, int CodewordsInGroup1, int BlocksInGroup2, int CodewordsInGroup2) GetEccInfo(int version, ECCLevel level) {
 			return ECCTable[version - 1, GetIndex(level)];
 		}
-		
+
 		public static int GetTotalEccBytes(int version, ECCLevel level) {
-			var info = GetEccInfo(version, level);
-			return (info.BlocksInGroup1 + info.BlocksInGroup2) * info.ECCPerBytes;
+			var (eccBytes, blocks1, _, blocks2, _) = GetEccInfo(version, level);
+			return (blocks1 + blocks2) * eccBytes;
 		}
-		
+
 		public static int GetTotalBytes(int version, ECCLevel level) {
 			var (eccBytes, blocks1, _, blocks2, _) = GetEccInfo(version, level);
 			return GetDataCapacityInfo(version, level).NumberOfDataBytes + (blocks1 + blocks2) * eccBytes;

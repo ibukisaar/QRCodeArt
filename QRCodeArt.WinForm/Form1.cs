@@ -89,7 +89,7 @@ namespace QRCodeArt.WinForm {
 				halftone = cellSize;
 				margin = 0;
 			}
-
+			
 			var bitmap = new Bitmap((N + 2) * cellSize, (N + 2) * cellSize);
 			using (var g = Graphics.FromImage(bitmap)) {
 				g.Clear(Color.White);
