@@ -28,6 +28,9 @@ namespace QRCodeArt {
 			public IntPtr[][] Cache;
 		}
 
+		/// <summary>
+		/// cacheHeaders[纠错码长度]
+		/// </summary>
 		readonly static Header[] cacheHeaders = new Header[31];
 
 		static int Align8(int n) => (n + 7) & ~7;
