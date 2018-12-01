@@ -1,12 +1,12 @@
-﻿using System;
+﻿using QRCodeArt;
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using QRCodeArt;
-using System.Collections;
-using System.Drawing;
-using System.Drawing.Imaging;
 
 namespace QRCodeArt.Console {
 	class Program {
@@ -14,7 +14,7 @@ namespace QRCodeArt.Console {
 			var white = Brushes.White;
 			var black = new SolidBrush(color);
 			using (Graphics g = Graphics.FromImage(bitmap)) {
-				g.Clear(Color.White);
+				if (writeWhite) g.Clear(Color.White);
 				for (int x = 0; x < qr.N; x++) {
 					for (int y = 0; y < qr.N; y++) {
 						if (!qr[x, y].Value && !writeWhite) continue;
@@ -27,11 +27,13 @@ namespace QRCodeArt.Console {
 
 		static void Save(string file, QRCode qr, QRCode qr2, int weight) {
 			const int padding = 20;
-			const int C = 150;
+			const int C = 128;
 			var bitmap = new Bitmap(padding * 2 + qr.N * weight, padding * 2 + qr.N * weight, PixelFormat.Format32bppRgb);
-			Save(padding, weight, bitmap, qr, qr2 != null ? Color.FromArgb(C, C, C) : Color.Black);
 			if (qr2 != null) {
-				Save(padding, weight, bitmap, qr2, Color.Black, false);
+				Save(padding, weight, bitmap, qr2, qr2 != null ? Color.FromArgb(C, C, C) : Color.Black);
+				Save(padding, weight, bitmap, qr, Color.Black, false);
+			} else {
+				Save(padding, weight, bitmap, qr, Color.Black);
 			}
 			bitmap.Save(file);
 		}
@@ -55,7 +57,7 @@ namespace QRCodeArt.Console {
 					if (qr[x, y].Value && qr2[x, y].Value) color = 0xFF000000;
 					else if (!qr[x, y].Value && !qr2[x, y].Value) color = 0xFFFFFFFF;
 					else color = 0;
-					DrawRect((uint*) bitmapData.Scan0, bitmap.Width, padding + x * weight, padding + y * weight, weight, color);
+					DrawRect((uint*)bitmapData.Scan0, bitmap.Width, padding + x * weight, padding + y * weight, weight, color);
 				}
 			}
 
@@ -64,6 +66,16 @@ namespace QRCodeArt.Console {
 		}
 
 		static void Main(string[] args) {
+			var data1 = Encoding.UTF8.GetBytes("九条可怜酱");
+			var data2 = Encoding.UTF8.GetBytes("HTTPS://SPACE.BILIBILI.COM/185316");
+			var (qr1, qr2) = QRCodeMagician.ObfuscatedQRCode(data1, data2);
+
+			Save(@"Z:\1.png", qr1, null, 6);
+			Save(@"Z:\2.png", qr2, null, 6);
+			Save(@"Z:\3.png", qr1, qr2, 6);
+		}
+
+		private static void NewMethod() {
 			//var g = new GF.XPolynom(GF.FromExponent(0), GF.FromExponent(0));
 			//var eccNum = 2;
 			//for (int i = 1; i < eccNum; i++) {
@@ -207,7 +219,7 @@ namespace QRCodeArt.Console {
 			pixels[10, 0] = ImagePixel.Any;
 			pixels[11, 0] = ImagePixel.Any;
 			pixels[12, 0] = ImagePixel.Any;
-			pixels[9, 1 ]= ImagePixel.Any;
+			pixels[9, 1] = ImagePixel.Any;
 			pixels[10, 1] = ImagePixel.Any;
 			pixels[11, 1] = ImagePixel.Any;
 			pixels[12, 1] = ImagePixel.Any;
@@ -248,7 +260,6 @@ namespace QRCodeArt.Console {
 			//var r2 = GF.XPolynom.RSEncode(bits.ByteArray, 0, bits.ByteArray.Length, 100);
 			//bits[3] = true;
 			//var r3 = GF.XPolynom.RSEncode(bits.ByteArray, 0, bits.ByteArray.Length, 100);
-
 		}
 
 		static void Print(byte[][] left, byte[][] right, List<int> indexes = null) {

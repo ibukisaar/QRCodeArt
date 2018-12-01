@@ -19,6 +19,9 @@ namespace QRCodeArt {
 			}
 		}
 
+		public bool IsWhite => !Value;
+		public bool IsBlack => Value;
+
 		public QRValueType Type {
 			get => (QRValueType)(bits >> 1);
 			set => bits = (byte)(((int)value << 1) | (bits & 1));

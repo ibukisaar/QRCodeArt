@@ -37,6 +37,7 @@ namespace QRCodeArt {
 		/// <param name="data1"></param>
 		/// <param name="data2"></param>
 		/// <returns></returns>
+		[Obsolete("这是个失败品，请不要使用", true)]
 		public static (QRCode QRCode1, QRCode QRCode2, bool Swap) CreateObfuscatedQRCode(byte[] data1, byte[] data2) {
 			for (int level = 0; level < 4; level++) {
 				var eccLevel = (ECCLevel)level;
@@ -101,7 +102,7 @@ namespace QRCodeArt {
 				result = 0;
 				return false;
 			}
-			result = sortedModeTable[i];
+			result = sortedModeTable[i + 1];
 			return true;
 		}
 
@@ -131,7 +132,7 @@ namespace QRCodeArt {
 			}
 		}
 
-		public static QRCode ImageArt(DataMode mode, int version, ECCLevel level, MaskVersion mask, byte[] data, ImagePixel[,] pixels, int maxErrorNumber = 0) {
+		public static QRCode ImageArt(DataMode mode, int version, ECCLevel level, MaskVersion mask, byte[] data, ImagePixel[,] pixels, int maxErrorNumber = 0, bool cracking = true) {
 			var qr = QRCode.AnalysisImageArt(version, mode, data, level, mask);
 			var encodedBytes = qr.Encoder.Encode(data, 0, data.Length, false, false);
 			var validBits = qr.Encoder.GetDataBitCount(data.Length);
@@ -173,7 +174,7 @@ namespace QRCodeArt {
 				// RS(padding) = RS(data) ^ image ^ mask
 				var templateData = templateBlocks[i].Data.Zip(flagBlocks[i].Data, (val, flag) => new MagicBit(flag == BitType.Freedom ? MagicBitType.Freedom : MagicBitType.Expect, val)).ToArray();
 				var templateEcc = templateBlocks[i].Ecc.Zip(flagBlocks[i].Ecc, (val, flag) => new MagicBit(flag == BitType.Freedom ? MagicBitType.Freedom : MagicBitType.Expect, val)).ToArray();
-				Match(templateData, templateEcc, dataBlocks[i].Data);
+				Match(templateData, templateEcc, dataBlocks[i].Data, cracking);
 
 				// RS(data+padding) = RS(data) ^ RS(padding) = RS(data) ^ RS(data) ^ image ^ mask = image ^ mask
 				var dataBytes = Arranger.ToByteArray(dataBlocks[i].Data);
@@ -478,7 +479,8 @@ namespace QRCodeArt {
 		/// <param name="templateData"></param>
 		/// <param name="templateEcc"></param>
 		/// <param name="outData"></param>
-		public static void Match(ReadOnlySpan<MagicBit> templateData, ReadOnlySpan<MagicBit> templateEcc, Span<bool> outData) {
+		/// <param name="cracking">如果为true，则尝试暴力破解方程组</param>
+		public static void Match(ReadOnlySpan<MagicBit> templateData, ReadOnlySpan<MagicBit> templateEcc, Span<bool> outData, bool cracking = true) {
 			if (templateData.Length != outData.Length) throw new ArgumentException($"{nameof(templateData)}和{nameof(outData)}长度不一致");
 			if (templateData.Length % 8 != 0) throw new ArgumentException($"{nameof(templateData)}的长度必须是8的倍数");
 			if (templateEcc.Length % 8 != 0) throw new ArgumentException($"{nameof(templateEcc)}的长度必须是8的倍数");
@@ -552,7 +554,7 @@ namespace QRCodeArt {
 			#endregion
 #endif
 
-			if (actualUnknowns.Count <= 24 && expects.Count >= 28) { // 如果未知数太少了，可以采用暴力搜索求解方程组
+			if (cracking && actualUnknowns.Count <= 24 && expects.Count >= 28) { // 如果未知数太少了，可以采用暴力搜索求解方程组
 				int expectsLongCount = (expects.Count + 63) / 64;
 				var eccVectorBuffer = stackalloc ulong[actualUnknowns.Count * expectsLongCount];
 				var targetEccBuffer = stackalloc ulong[expectsLongCount];
@@ -598,7 +600,7 @@ namespace QRCodeArt {
 					}
 				}
 
-				if (error >= 2) { // 局部暴力搜索，尝试降低错误，提高匹配率
+				if (cracking && error >= 2) { // 局部暴力搜索，尝试降低错误，提高匹配率
 					var loopLevel = Math.Min((int)Math.Log(1000_0000, actualUnknowns.Count), error - 1); // 大约尝试1千万次
 					var indexes = stackalloc int[loopLevel];
 					int expectsLongCount = (expects.Count + 63) / 64;
@@ -1048,6 +1050,128 @@ namespace QRCodeArt {
 			bitmap.UnlockBits(data);
 			binarizer.UnlockBits(binarizerData);
 			return (binarizer, result);
+		}
+
+		public static QRCode CreateObfuscatedQRCode(QRCode qrCode, byte[] newData, DataMode mode, ECCLevel eccLevel, MaskVersion maskVersion) {
+			var version = qrCode.Version;
+			var pixels = new ImagePixel[qrCode.N, qrCode.N];
+			for (int y = 0; y < qrCode.N; y++) {
+				for (int x = 0; x < qrCode.N; x++) {
+					if (qrCode[x, y].IsWhite) {
+						pixels[x, y] = ImagePixel.White | ImagePixel.Any;
+					} else {
+						pixels[x, y] = ImagePixel.Black;
+					}
+				}
+			}
+
+			QRCode newQR;
+			try {
+				newQR = ImageArt(mode, version, eccLevel, maskVersion, newData, pixels, 0, false);
+			} catch (ArgumentOutOfRangeException) {
+				return null;
+			}
+			if (!OverlayAnalyzer.IsOverlay(qrCode.FormatBinary, newQR.FormatBinary)) return null;
+
+			bool[,] diff = new bool[qrCode.N, qrCode.N];
+
+			for (int y = 0; y < qrCode.N; y++) {
+				for (int x = 0; x < qrCode.N; x++) {
+					if (qrCode[x, y].IsBlack && newQR[x, y].IsWhite) {
+						diff[x, y] = true;
+					}
+				}
+			}
+
+			var diffArray = Arranger.ToByteArray(newQR.BitmapDataToArray(diff));
+			var diffBlocks = Arranger.GetBlocks(version, eccLevel, diffArray);
+			var maxError = QRInfo.GetMaxErrorAllowBytes(version, eccLevel);
+			foreach (var (data, ecc) in diffBlocks) {
+				int error = data.Count(b => b != 0) + ecc.Count(b => b != 0);
+				if (error > maxError) goto Fail;
+			}
+			return newQR;
+
+			// 基本上都会失败，这时候要在容错的情况下修改2个QRCode
+			Fail:
+			var indexBlocks1 = Arranger.GetBlocks<byte>(version, qrCode.ECCLevel);
+			var indexBlocks2 = Arranger.GetBlocks<byte>(version, eccLevel);
+			var maxError1 = QRInfo.GetMaxErrorAllowBytes(version, qrCode.ECCLevel);
+			var maxError2 = maxError;
+			var errorCounter1 = stackalloc byte[indexBlocks1.Length];
+			var errorCounter2 = stackalloc byte[indexBlocks2.Length];
+			var spaceCounter1 = stackalloc byte[indexBlocks1.Length];
+			var spaceCounter2 = stackalloc byte[indexBlocks2.Length];
+
+			for (int i = 0; i < indexBlocks1.Length; i++) {
+				indexBlocks1[i].Data.AsSpan().Fill((byte)i);
+				indexBlocks1[i].Ecc.AsSpan().Fill((byte)i);
+				spaceCounter1[i] = (byte)(indexBlocks1[i].Data.Length + indexBlocks1[i].Ecc.Length);
+			}
+			for (int i = 0; i < indexBlocks2.Length; i++) {
+				indexBlocks2[i].Data.AsSpan().Fill((byte)i);
+				indexBlocks2[i].Ecc.AsSpan().Fill((byte)i);
+				spaceCounter2[i] = (byte)(indexBlocks2[i].Data.Length + indexBlocks2[i].Ecc.Length);
+			}
+
+			var indexes1 = Arranger.Interlock(indexBlocks1);
+			var indexes2 = Arranger.Interlock(indexBlocks2);
+			var data1 = qrCode.DataToArray();
+			var data2 = newQR.DataToArray();
+			for (int i = 0; i < diffArray.Length; i++) {
+				if (diffArray[i] != 0) {
+					if ((spaceCounter1[indexes1[i]] < spaceCounter2[indexes2[i]] || errorCounter2[indexes2[i]] >= maxError2) && errorCounter1[indexes1[i]] < maxError1) {
+						data1[i] = data2[i];
+						errorCounter1[indexes1[i]]++;
+						spaceCounter1[indexes1[i]]--;
+						spaceCounter2[indexes2[i]]--;
+					} else if (errorCounter2[indexes2[i]] < maxError2) {
+						data2[i] = data1[i];
+						errorCounter2[indexes2[i]]++;
+						spaceCounter1[indexes1[i]]--;
+						spaceCounter2[indexes2[i]]--;
+					} else {
+						return null;
+					}
+				}
+			}
+
+			qrCode.WriteData(data1, false);
+			newQR.WriteData(data2, false);
+			return newQR;
+		}
+
+		public static QRCode CreateObfuscatedQRCode(QRCode qrCode, byte[] newData) {
+			var mode = DataEncoder.GuessMode(newData);
+			while (true) {
+				for (int eccLevel = 0; eccLevel < 4; eccLevel++) {
+					for (int mask = 0; mask < 8; mask++) {
+						var newQR = CreateObfuscatedQRCode(qrCode, newData, mode, (ECCLevel)eccLevel, (MaskVersion)mask);
+						if (newQR != null) return newQR;
+					}
+				}
+				if (!NextMode(mode, out mode)) break;
+			}
+			return null;
+		}
+
+		public static (QRCode QR1, QRCode QR2) ObfuscatedQRCode(byte[] data1, byte[] data2) {
+			for (int version = 1; version <= 40; version++) {
+				var mode = DataEncoder.GuessMode(data1);
+				while (true) {
+					for (int eccLevel = 0; eccLevel < 4; eccLevel++) {
+						for (int mask = 0; mask < 8; mask++) {
+							try {
+								var qr1 = new QRCode(version, mode, data1, (ECCLevel)eccLevel, (MaskVersion)mask);
+								var qr2 = CreateObfuscatedQRCode(qr1, data2);
+								if (qr2 != null) return (qr1, qr2);
+							} catch { }
+						}
+					}
+					if (!NextMode(mode, out mode)) break;
+				}
+			}
+			return default;
 		}
 	}
 }

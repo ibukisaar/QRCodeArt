@@ -45,6 +45,28 @@ namespace QRCodeArt {
 			return result;
 		}
 
+		public static IEnumerable<int> GetBlockGroupEnumerable(int blocks1, int words1, int blocks2, int words2, int eccNum) {
+			var sumBlocks = blocks1 + blocks2;
+			var maxWords = Math.Max(words1, words2);
+			for (int wordIndex = 0; wordIndex < maxWords; wordIndex++) {
+				if (wordIndex < words1) {
+					for (int blockIndex = 0; blockIndex < blocks1; blockIndex++) {
+						yield return blockIndex;
+					}
+				}
+				if (wordIndex < words2) {
+					for (int blockIndex = blocks1; blockIndex < sumBlocks; blockIndex++) {
+						yield return blockIndex;
+					}
+				}
+			}
+			for (int eccIndex = 0; eccIndex < eccNum; eccIndex++) {
+				for (int blockIndex = 0; blockIndex < sumBlocks; blockIndex++) {
+					yield return blockIndex;
+				}
+			}
+		}
+
 		public static (T[] Data, T[] Ecc)[] GetBlocks<T>(int blocks1, int words1, int blocks2, int words2, int eccNum, int step, IEnumerable<T> dataIterator = null, bool withEcc = true) {
 			var sumBlocks = blocks1 + blocks2;
 			var maxWords = Math.Max(words1, words2);

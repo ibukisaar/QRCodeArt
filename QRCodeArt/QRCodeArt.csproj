@@ -82,6 +82,7 @@
     <Compile Include="QRCodeMagician.cs" />
     <Compile Include="DataMode.cs" />
     <Compile Include="DataEncoder.cs" />
+    <Compile Include="QRData.cs" />
     <Compile Include="QRInfo.cs" />
     <Compile Include="QRPaintEventArgs.cs" />
     <Compile Include="QRSurface.cs" />

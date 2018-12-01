@@ -523,18 +523,18 @@ namespace QRCodeArt {
 		}
 
 		public static int GetMaxErrorAllowBytes(int version, ECCLevel level) {
-			if (version == 1) {
-				return level == ECCLevel.L ? 2 :
-					level == ECCLevel.M ? 4 :
-					level == ECCLevel.Q ? 6 :
-					8;
-			} else if (version == 2 && level == ECCLevel.L) {
-				return 4;
-			} else if (version == 3 && level == ECCLevel.L) {
-				return 7;
-			} else {
+			//if (version == 1) {
+			//	return level == ECCLevel.L ? 2 :
+			//		level == ECCLevel.M ? 4 :
+			//		level == ECCLevel.Q ? 6 :
+			//		8;
+			//} else if (version == 2 && level == ECCLevel.L) {
+			//	return 4;
+			//} else if (version == 3 && level == ECCLevel.L) {
+			//	return 7;
+			//} else {
 				return GetEccInfo(version, level).ECCPerBytes / 2;
-			}
+			//}
 		}
 	}
 }

@@ -28,6 +28,7 @@ namespace QRCodeArt {
 
 		public ref QRValue this[int x, int y] => ref valueMap[x, y];
 
+		
 		public QRCode(int version, DataMode dataMode, byte[] data, ECCLevel eccLevel = ECCLevel.L, MaskVersion maskVersion = MaskVersion.Version000)
 			: this(version, dataMode, data, eccLevel, maskVersion, AnalysisType.None) {
 		}
@@ -45,6 +46,18 @@ namespace QRCodeArt {
 
 			valueMap = new QRValue[N, N];
 			Init(data, analysisType);
+		}
+
+		private QRCode(QRCode other) {
+			DataMode = other.DataMode;
+			Version = other.Version;
+			N = other.N;
+			ECCLevel = other.ECCLevel;
+			MaskVersion = other.MaskVersion;
+			encoder = other.encoder;
+			maxErrorAllowBytes = other.maxErrorAllowBytes;
+			formatBinary = other.formatBinary;
+			valueMap = other.valueMap.Clone() as QRValue[,];
 		}
 
 		private void Init(byte[] data, AnalysisType analysis) {
@@ -373,6 +386,16 @@ namespace QRCodeArt {
 			}
 			return result;
 		}
+
+		public byte[] DataToArray() {
+			var bits = new BitSet(QRInfo.GetTotalBytes(Version, ECCLevel) * 8);
+			foreach (var (i, x, y) in GetDataRegionPoints()) {
+				bits[i] = valueMap[x, y].Value;
+			}
+			return bits.ByteArray;
+		}
+
+		public QRCode Clone() => new QRCode(this);
 
 		public static QRCode AnalysisOverlay(int version, DataMode dataMode, byte[] data, ECCLevel eccLevel, MaskVersion maskVersion) {
 			return new QRCode(version, dataMode, data, eccLevel, maskVersion, AnalysisType.Overlay);
