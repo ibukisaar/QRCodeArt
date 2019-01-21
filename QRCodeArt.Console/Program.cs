@@ -66,13 +66,13 @@ namespace QRCodeArt.Console {
 		}
 
 		static void Main(string[] args) {
-			var data1 = Encoding.UTF8.GetBytes("九条可怜酱");
-			var data2 = Encoding.UTF8.GetBytes("HTTPS://SPACE.BILIBILI.COM/185316");
-			var (qr1, qr2) = QRCodeMagician.ObfuscatedQRCode(data1, data2);
+			var data1 = Encoding.UTF8.GetBytes("0123456789038912381290");
+			var data2 = Encoding.UTF8.GetBytes("这是一条测试文本");
+			var (qr1, qr2) = QRCodeMagician.CreateObfuscatedQRCode(data1, data2);
 
 			Save(@"Z:\1.png", qr1, null, 6);
 			Save(@"Z:\2.png", qr2, null, 6);
-			Save(@"Z:\3.png", qr1, qr2, 6);
+			Save(@"Z:\1+2.png", qr1, qr2, 6);
 		}
 
 		private static void NewMethod() {

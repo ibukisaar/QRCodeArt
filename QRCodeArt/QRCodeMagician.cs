@@ -31,67 +31,67 @@ namespace QRCodeArt {
 			return Int4Table[x >> 4] + Int4Table[x & 15];
 		}
 
-		/// <summary>
-		/// 创建混淆QR Code，第二个QR Code将藏在第一个里面。
-		/// </summary>
-		/// <param name="data1"></param>
-		/// <param name="data2"></param>
-		/// <returns></returns>
-		[Obsolete("这是个失败品，请不要使用", true)]
-		public static (QRCode QRCode1, QRCode QRCode2, bool Swap) CreateObfuscatedQRCode(byte[] data1, byte[] data2) {
-			for (int level = 0; level < 4; level++) {
-				var eccLevel = (ECCLevel)level;
-				var mode1 = DataEncoder.GuessMode(data1);
-				while (true) {
-					var mode2 = DataEncoder.GuessMode(data2);
-					while (true) {
-						var ver1 = DataEncoder.GuessVersion(data1.Length, eccLevel, mode1);
-						var ver2 = DataEncoder.GuessVersion(data2.Length, eccLevel, mode2);
-						var ver = Math.Max(ver1, ver2);
-						for (; ver <= 40; ver++) {
-							for (int mask1 = 0; mask1 < 8; mask1++) {
-								var qr1 = QRCode.AnalysisOverlay(ver, mode1, data1, eccLevel, (MaskVersion)mask1);
-								for (int mask2 = 0; mask2 < 8; mask2++) {
-									var qr2 = QRCode.AnalysisOverlay(ver, mode2, data2, eccLevel, (MaskVersion)mask2);
-									var foverlay = OverlayAnalyzer.IsOverlay(qr1.FormatBinary, qr2.FormatBinary);
-									if (foverlay) {
-										var overlay = OverlayAnalyzer.IsOverlay(qr1.AnalysisGroup, qr2.AnalysisGroup, qr1.MaxErrorAllowBytes + qr2.MaxErrorAllowBytes);
-										if (overlay) {
-											var (f1, f2) = OverlayAnalyzer.FormatOverlay(qr1.FormatBinary, qr2.FormatBinary);
-											OverlayAnalyzer.Overlay(qr1.AnalysisGroup, qr2.AnalysisGroup, qr1.MaxErrorAllowBytes, qr2.MaxErrorAllowBytes);
-											qr1.WriteFormatInformation(f1);
-											qr2.WriteFormatInformation(f2);
-											// if (!OverlayAnalyzer.IsOverlay(qr1.AnalysisGroup, qr2.AnalysisGroup, 0)) throw new InvalidOperationException();
-											qr1.Flush();
-											qr2.Flush();
-											return (qr1, qr2, false);
-										}
-									}
+		///// <summary>
+		///// 创建混淆QR Code，第二个QR Code将藏在第一个里面。
+		///// </summary>
+		///// <param name="data1"></param>
+		///// <param name="data2"></param>
+		///// <returns></returns>
+		//[Obsolete("这是个失败品，请不要使用", true)]
+		//public static (QRCode QRCode1, QRCode QRCode2, bool Swap) CreateObfuscatedQRCode(byte[] data1, byte[] data2) {
+		//	for (int level = 0; level < 4; level++) {
+		//		var eccLevel = (ECCLevel)level;
+		//		var mode1 = DataEncoder.GuessMode(data1);
+		//		while (true) {
+		//			var mode2 = DataEncoder.GuessMode(data2);
+		//			while (true) {
+		//				var ver1 = DataEncoder.GuessVersion(data1.Length, eccLevel, mode1);
+		//				var ver2 = DataEncoder.GuessVersion(data2.Length, eccLevel, mode2);
+		//				var ver = Math.Max(ver1, ver2);
+		//				for (; ver <= 40; ver++) {
+		//					for (int mask1 = 0; mask1 < 8; mask1++) {
+		//						var qr1 = QRCode.AnalysisOverlay(ver, mode1, data1, eccLevel, (MaskVersion)mask1);
+		//						for (int mask2 = 0; mask2 < 8; mask2++) {
+		//							var qr2 = QRCode.AnalysisOverlay(ver, mode2, data2, eccLevel, (MaskVersion)mask2);
+		//							var foverlay = OverlayAnalyzer.IsOverlay(qr1.FormatBinary, qr2.FormatBinary);
+		//							if (foverlay) {
+		//								var overlay = OverlayAnalyzer.IsOverlay(qr1.AnalysisGroup, qr2.AnalysisGroup, qr1.MaxErrorAllowBytes + qr2.MaxErrorAllowBytes);
+		//								if (overlay) {
+		//									var (f1, f2) = OverlayAnalyzer.FormatOverlay(qr1.FormatBinary, qr2.FormatBinary);
+		//									OverlayAnalyzer.Overlay(qr1.AnalysisGroup, qr2.AnalysisGroup, qr1.MaxErrorAllowBytes, qr2.MaxErrorAllowBytes);
+		//									qr1.WriteFormatInformation(f1);
+		//									qr2.WriteFormatInformation(f2);
+		//									// if (!OverlayAnalyzer.IsOverlay(qr1.AnalysisGroup, qr2.AnalysisGroup, 0)) throw new InvalidOperationException();
+		//									qr1.Flush();
+		//									qr2.Flush();
+		//									return (qr1, qr2, false);
+		//								}
+		//							}
 
-									foverlay = OverlayAnalyzer.IsOverlay(qr2.FormatBinary, qr1.FormatBinary);
-									if (foverlay) {
-										var overlay = OverlayAnalyzer.IsOverlay(qr2.AnalysisGroup, qr1.AnalysisGroup, qr1.MaxErrorAllowBytes + qr2.MaxErrorAllowBytes);
-										if (overlay) {
-											var (f2, f1) = OverlayAnalyzer.FormatOverlay(qr2.FormatBinary, qr1.FormatBinary);
-											OverlayAnalyzer.Overlay(qr2.AnalysisGroup, qr1.AnalysisGroup, qr2.MaxErrorAllowBytes, qr1.MaxErrorAllowBytes);
-											qr1.WriteFormatInformation(f1);
-											qr2.WriteFormatInformation(f2);
-											// if (!OverlayAnalyzer.IsOverlay(qr2.AnalysisGroup, qr1.AnalysisGroup, 0)) throw new InvalidOperationException();
-											qr1.Flush();
-											qr2.Flush();
-											return (qr2, qr1, true);
-										}
-									}
-								}
-							}
-						}
-						if (!NextMode(mode2, out mode2)) break;
-					}
-					if (!NextMode(mode1, out mode1)) break;
-				}
-			}
-			return default;
-		}
+		//							foverlay = OverlayAnalyzer.IsOverlay(qr2.FormatBinary, qr1.FormatBinary);
+		//							if (foverlay) {
+		//								var overlay = OverlayAnalyzer.IsOverlay(qr2.AnalysisGroup, qr1.AnalysisGroup, qr1.MaxErrorAllowBytes + qr2.MaxErrorAllowBytes);
+		//								if (overlay) {
+		//									var (f2, f1) = OverlayAnalyzer.FormatOverlay(qr2.FormatBinary, qr1.FormatBinary);
+		//									OverlayAnalyzer.Overlay(qr2.AnalysisGroup, qr1.AnalysisGroup, qr2.MaxErrorAllowBytes, qr1.MaxErrorAllowBytes);
+		//									qr1.WriteFormatInformation(f1);
+		//									qr2.WriteFormatInformation(f2);
+		//									// if (!OverlayAnalyzer.IsOverlay(qr2.AnalysisGroup, qr1.AnalysisGroup, 0)) throw new InvalidOperationException();
+		//									qr1.Flush();
+		//									qr2.Flush();
+		//									return (qr2, qr1, true);
+		//								}
+		//							}
+		//						}
+		//					}
+		//				}
+		//				if (!NextMode(mode2, out mode2)) break;
+		//			}
+		//			if (!NextMode(mode1, out mode1)) break;
+		//		}
+		//	}
+		//	return default;
+		//}
 
 		static readonly int[] modeIndexes = { -1, 0, 1, 2, -1, -1, -1, -1 };
 		static readonly DataMode[] sortedModeTable = { DataMode.Numeric, DataMode.Alphanumeric, DataMode.Byte };
@@ -637,7 +637,7 @@ namespace QRCodeArt {
 					int error0 = error;
 
 					while (minError > currLoopLevel) {
-						Restart:
+					Restart:
 						indexes[0]++;
 						int i = 0;
 						for (; i < currLoopLevel - 1; i++) {
@@ -1072,6 +1072,9 @@ namespace QRCodeArt {
 				return null;
 			}
 			if (!OverlayAnalyzer.IsOverlay(qrCode.FormatBinary, newQR.FormatBinary)) return null;
+			var (format1, format2) = OverlayAnalyzer.FormatOverlay(qrCode.FormatBinary, newQR.FormatBinary);
+			qrCode.WriteFormatInformation(format1);
+			newQR.WriteFormatInformation(format2);
 
 			bool[,] diff = new bool[qrCode.N, qrCode.N];
 
@@ -1090,10 +1093,18 @@ namespace QRCodeArt {
 				int error = data.Count(b => b != 0) + ecc.Count(b => b != 0);
 				if (error > maxError) goto Fail;
 			}
+
+			for (int y = 0; y < diff.GetLength(1); y++) {
+				for (int x = 0; x < diff.GetLength(0); x++) {
+					if (diff[x, y]) {
+						newQR[x, y].Value = true;
+					}
+				}
+			}
 			return newQR;
 
-			// 基本上都会失败，这时候要在容错的情况下修改2个QRCode
-			Fail:
+		// 基本上都会失败，这时候要在容错的情况下修改2个QRCode
+		Fail:
 			var indexBlocks1 = Arranger.GetBlocks<byte>(version, qrCode.ECCLevel);
 			var indexBlocks2 = Arranger.GetBlocks<byte>(version, eccLevel);
 			var maxError1 = QRInfo.GetMaxErrorAllowBytes(version, qrCode.ECCLevel);
@@ -1114,6 +1125,7 @@ namespace QRCodeArt {
 				spaceCounter2[i] = (byte)(indexBlocks2[i].Data.Length + indexBlocks2[i].Ecc.Length);
 			}
 
+			var random = new Random();
 			var indexes1 = Arranger.Interlock(indexBlocks1);
 			var indexes2 = Arranger.Interlock(indexBlocks2);
 			var data1 = qrCode.DataToArray();
@@ -1121,12 +1133,12 @@ namespace QRCodeArt {
 			for (int i = 0; i < diffArray.Length; i++) {
 				if (diffArray[i] != 0) {
 					if ((spaceCounter1[indexes1[i]] < spaceCounter2[indexes2[i]] || errorCounter2[indexes2[i]] >= maxError2) && errorCounter1[indexes1[i]] < maxError1) {
-						data1[i] = data2[i];
+						data1[i] = (byte)(data2[i] & random.Next());
 						errorCounter1[indexes1[i]]++;
 						spaceCounter1[indexes1[i]]--;
 						spaceCounter2[indexes2[i]]--;
 					} else if (errorCounter2[indexes2[i]] < maxError2) {
-						data2[i] = data1[i];
+						data2[i] = (byte)(data1[i] | random.Next());
 						errorCounter2[indexes2[i]]++;
 						spaceCounter1[indexes1[i]]--;
 						spaceCounter2[indexes2[i]]--;
@@ -1138,6 +1150,14 @@ namespace QRCodeArt {
 
 			qrCode.WriteData(data1, false);
 			newQR.WriteData(data2, false);
+
+			// 设置padding区域，虽然不重要
+			foreach (var (i, x, y) in qrCode.GetPoints(QRValueType.Padding)) {
+				if (qrCode[x, y].IsBlack || random.Next(2) == 0) {
+					newQR[x, y].Value = true;
+				}
+			}
+
 			return newQR;
 		}
 
@@ -1155,7 +1175,7 @@ namespace QRCodeArt {
 			return null;
 		}
 
-		public static (QRCode QR1, QRCode QR2) ObfuscatedQRCode(byte[] data1, byte[] data2) {
+		public static (QRCode QR1, QRCode QR2) CreateObfuscatedQRCode(byte[] data1, byte[] data2) {
 			for (int version = 1; version <= 40; version++) {
 				var mode = DataEncoder.GuessMode(data1);
 				while (true) {
