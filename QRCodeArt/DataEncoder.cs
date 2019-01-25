@@ -45,13 +45,13 @@ namespace QRCodeArt {
 			bitResult.Write(4 + BitsOfDataLength, binary, 0, binary.Count);
 
 			if (fillPadding) {
-				var padStart = (validBits + 7) & ~7;
-				while (padStart < bitResult.Count) {
-					bitResult.Write(padStart, 0b11101100, 8);
-					padStart += 8;
-					if (padStart < bitResult.Count) {
-						bitResult.Write(padStart, 0b00010001, 8);
-						padStart += 8;
+				var paddingStart = (validBits + 7) & ~7;
+				while (paddingStart < bitResult.Count) {
+					bitResult.Write(paddingStart, 0b11101100, 8);
+					paddingStart += 8;
+					if (paddingStart < bitResult.Count) {
+						bitResult.Write(paddingStart, 0b00010001, 8);
+						paddingStart += 8;
 					}
 				}
 			}

@@ -66,13 +66,64 @@ namespace QRCodeArt.Console {
 		}
 
 		static void Main(string[] args) {
-			var data1 = Encoding.UTF8.GetBytes("0123456789038912381290");
-			var data2 = Encoding.UTF8.GetBytes("这是一条测试文本");
+			var data1 = Encoding.UTF8.GetBytes("1234567890");
+			var data2 = Encoding.UTF8.GetBytes("测试文本");
 			var (qr1, qr2) = QRCodeMagician.CreateObfuscatedQRCode(data1, data2);
 
 			Save(@"Z:\1.png", qr1, null, 6);
 			Save(@"Z:\2.png", qr2, null, 6);
 			Save(@"Z:\1+2.png", qr1, qr2, 6);
+		}
+
+		private static void NewMethod1() {
+			Random random = new Random();
+			const int Version = 6;
+			var data = Encoding.UTF8.GetBytes("0.0");
+			int N = QRInfo.GetN(Version);
+			ImagePixel[,] pixels = new ImagePixel[N, N];
+			const int range = 7;
+
+			for (int y = 0; y < N; y++) {
+				for (int x = 0; x < N; x++) {
+					if (y < N / 2 && random.NextDouble() < (N / 2 - y) / (double)range) {
+						pixels[x, y] = ImagePixel.Black;
+					} else if (y > N / 2 && random.NextDouble() < (y - N / 2) / (double)range) {
+						pixels[x, y] = ImagePixel.White;
+					} else if (y < N / 2) {
+						pixels[x, y] = ImagePixel.Black | ImagePixel.Any;
+					} else {
+						pixels[x, y] = ImagePixel.White | ImagePixel.Any;
+					}
+				}
+			}
+			var qrcode = QRCodeMagician.ImageArt(DataMode.Alphanumeric, Version, ECCLevel.L, MaskVersion.Version010, data, pixels);
+
+
+			for (int y = 0; y < N; y++) {
+				for (int x = 0; x < N; x++) {
+					void SetValue(bool value) {
+						switch (qrcode[x, y].Type) {
+							case QRValueType.Data:
+							case QRValueType.DataPadding:
+							case QRValueType.Ecc:
+							case QRValueType.TimingPatterns:
+							case QRValueType.FixedPoint:
+							case QRValueType.Padding:
+								qrcode[x, y].Value = value;
+								break;
+						}
+					}
+
+					if (y < N / 2 - range) {
+						SetValue(true);
+					} else if (y > N / 2 + range) {
+						SetValue(false);
+					} else if (qrcode[x, y].Type == QRValueType.TimingPatterns) {
+						SetValue(y < N / 2);
+					}
+				}
+			}
+			Save(@"Z:\out.png", qrcode, null, 6);
 		}
 
 		private static void NewMethod() {

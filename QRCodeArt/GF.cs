@@ -115,6 +115,7 @@ namespace QRCodeArt {
 		public GF Reciprocal {
 			get {
 				if (IsZero) throw new DivideByZeroException();
+				if (Polynom == One.Polynom) return One;
 				return FromExponent(N - Exponent);
 			}
 		}
@@ -300,7 +301,7 @@ namespace QRCodeArt {
 
 				return rem;
 			}
-			
+
 			public static void RSEncode(ReadOnlySpan<byte> msg, Span<byte> ecc) {
 				int eccCount = ecc.Length;
 				var gp = Cache<int, XPolynom>.Get(eccCount, n => {
@@ -364,12 +365,16 @@ namespace QRCodeArt {
 
 				Span<GF> errX = stackalloc GF[errCoefficient.Length];
 				var errCount = 0;
-				for (int i = 0; i < N; i++) {
+				for (int i = Math.Max(N + 1 - h.PolynomsCount, 1); i < N; i++) {
 					GF x = FromExponent(i);
 					if (errIndexPolynom.Apply(x).IsZero) {
 						errX[errCount++] = x;
 					}
 				}
+				if (errIndexPolynom.Apply(One).IsZero) {
+					errX[errCount++] = One;
+				}
+
 				if (errCount != errCoefficient.Length)
 					throw new TooManyErrorException();
 
